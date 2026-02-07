@@ -1,0 +1,77 @@
+# ─── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+.venv/
+venv/
+.uv/
+uv.lock
+
+# ─── Go ───────────────────────────────────────────────────
+bin/
+vendor/
+
+# ─── Testing & Coverage ──────────────────────────────────
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage.xml
+*.cover
+
+# ─── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ─── Docker ───────────────────────────────────────────────
+docker-compose.override.yml
+
+# ─── Environment & Secrets ────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# ─── Build artifacts ──────────────────────────────────────
+*.log
+tmp/
+
+# ─── Protobuf generated ──────────────────────────────────
+*_pb2.py
+*_pb2_grpc.py
+*_pb2.pyi
+*.pb.go
+
+# ─── Helm ─────────────────────────────────────────────────
+deploy/helm/charts/
+*.tgz
+
+# ─── OpenTofu / Terraform ───────────────────────────────
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# --- Code specific ---──────────────────────────────────────────────
+.claude
+.deadcode
+.vscode
+
+# --- SonarQube ---──────────────────────────────────────────────
+.sonarlint/
+.scannerwork/

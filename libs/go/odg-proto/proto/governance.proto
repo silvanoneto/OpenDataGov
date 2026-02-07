@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package odg.proto.v1;
+
+option go_package = "github.com/silvanoneto/opendatagov/libs/go/odg-proto/gen/go/v1";
+
+import "google/protobuf/timestamp.proto";
+
+// DecisionType represents the category of governance decision.
+enum DecisionType {
+  DECISION_TYPE_UNSPECIFIED = 0;
+  DECISION_TYPE_DATA_PROMOTION = 1;
+  DECISION_TYPE_SCHEMA_CHANGE = 2;
+  DECISION_TYPE_ACCESS_GRANT = 3;
+  DECISION_TYPE_EXPERT_REGISTRATION = 4;
+  DECISION_TYPE_POLICY_CHANGE = 5;
+  DECISION_TYPE_EMERGENCY = 6;
+}
+
+// DecisionStatus represents the current state of a governance decision.
+enum DecisionStatus {
+  DECISION_STATUS_UNSPECIFIED = 0;
+  DECISION_STATUS_PENDING = 1;
+  DECISION_STATUS_AWAITING_APPROVAL = 2;
+  DECISION_STATUS_APPROVED = 3;
+  DECISION_STATUS_REJECTED = 4;
+  DECISION_STATUS_VETOED = 5;
+  DECISION_STATUS_ESCALATED = 6;
+}
+
+// VoteValue represents the vote cast by an approver.
+enum VoteValue {
+  VOTE_VALUE_UNSPECIFIED = 0;
+  VOTE_VALUE_APPROVE = 1;
+  VOTE_VALUE_REJECT = 2;
+  VOTE_VALUE_ABSTAIN = 3;
+}
+
+// VetoStatus represents the current state of a veto.
+enum VetoStatus {
+  VETO_STATUS_UNSPECIFIED = 0;
+  VETO_STATUS_ACTIVE = 1;
+  VETO_STATUS_EXPIRED = 2;
+  VETO_STATUS_OVERRIDDEN = 3;
+}
+
+// RACIRole represents the RACI responsibility assignment.
+enum RACIRole {
+  RACI_ROLE_UNSPECIFIED = 0;
+  RACI_ROLE_RESPONSIBLE = 1;
+  RACI_ROLE_ACCOUNTABLE = 2;
+  RACI_ROLE_CONSULTED = 3;
+  RACI_ROLE_INFORMED = 4;
+}
+
+// GovernanceDecision represents a formal governance decision within the
+// data governance framework.
+message GovernanceDecision {
+  string id = 1;
+  DecisionType decision_type = 2;
+  string title = 3;
+  string description = 4;
+  DecisionStatus status = 5;
+  string domain_id = 6;
+  string created_by = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  map<string, string> metadata = 10;
+  string source_layer = 11;
+  string target_layer = 12;
+  string data_classification = 13;
+}
+
+// ApprovalRecord captures a single vote on a governance decision.
+message ApprovalRecord {
+  string id = 1;
+  string decision_id = 2;
+  string voter_id = 3;
+  RACIRole voter_role = 4;
+  VoteValue vote = 5;
+  string comment = 6;
+  google.protobuf.Timestamp voted_at = 7;
+}
+
+// VetoRecord captures a veto action against a governance decision.
+message VetoRecord {
+  string id = 1;
+  string decision_id = 2;
+  string vetoed_by = 3;
+  RACIRole vetoed_by_role = 4;
+  string reason = 5;
+  VetoStatus status = 6;
+  google.protobuf.Timestamp vetoed_at = 7;
+  google.protobuf.Timestamp expires_at = 8;
+  string overridden_by = 9;
+  google.protobuf.Timestamp overridden_at = 10;
+}

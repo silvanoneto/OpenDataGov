@@ -1,0 +1,65 @@
+name: CI Sonar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: odg
+          POSTGRES_PASSWORD: odg
+          POSTGRES_DB: odg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: services/gateway/go.mod
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Python coverage
+        env:
+          DATABASE_URL: postgresql+asyncpg://odg:odg@localhost:5432/odg_test
+          REDIS_URL: redis://localhost:6379/0
+        run: >-
+          uv run pytest
+          libs/python/odg-core/tests/
+          services/governance-engine/tests/
+          services/lakehouse-agent/tests/
+          services/data-expert/tests/
+          --import-mode=importlib
+          --cov --cov-report=xml -q
+
+      - name: Go coverage
+        working-directory: services/gateway
+        run: go test ./internal/... -race -coverprofile=coverage.out
+
+      - name: SonarCloud scan
+        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 # v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

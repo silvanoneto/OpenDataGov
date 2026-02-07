@@ -1,0 +1,122 @@
+[project]
+name = "OpenDataGov"
+version = "0.1.0"
+description = "Open-source data governance platform with progressive AI capabilities"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+
+[dependency-groups]
+dev = [
+    "odg-core",
+    "governance-engine",
+    "lakehouse-agent",
+    "data-expert",
+    "pytest>=9.0",
+    "pytest-asyncio>=1.0",
+    "pytest-cov>=7.0",
+]
+
+[tool.uv.sources]
+odg-core = { workspace = true }
+governance-engine = { workspace = true }
+lakehouse-agent = { workspace = true }
+data-expert = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "libs/python/odg-core",
+    "services/governance-engine",
+    "services/lakehouse-agent",
+    "services/data-expert",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "A",   # flake8-builtins
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "RUF", # ruff-specific
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/api/*.py" = ["TCH"]      # FastAPI evaluates annotations at runtime
+"**/main.py" = ["TCH"]       # lifespan/app startup needs runtime imports
+"**/tests/*.py" = ["TCH"]    # pytest fixtures resolve types at runtime
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fastapi",
+    "fastapi.*",
+    "nats",
+    "nats.*",
+    "minio",
+    "minio.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "governance_engine.api.*",
+    "governance_engine.main",
+    "lakehouse_agent.api.*",
+    "lakehouse_agent.main",
+    "data_expert.api.*",
+    "data_expert.main",
+]
+disallow_untyped_decorators = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = [
+    "odg_core",
+    "governance_engine",
+    "lakehouse_agent",
+    "data_expert",
+]
+omit = [
+    "*/migrations/*",
+    "*/db/engine.py",
+    "*/db/redis.py",
+    "*/db/tables.py",
+    "*/db/__init__.py",
+    "*/repository/postgres.py",
+    "*/repository/protocols.py",
+    "*/api/deps.py",
+    "*/api/routes*.py",
+    "*/api/schemas.py",
+    "*/events/publisher.py",
+    "*/main.py",
+    "*/minio_client.py",
+]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "pass",
+    "\\.\\.\\.",
+]

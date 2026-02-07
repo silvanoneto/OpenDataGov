@@ -1,0 +1,33 @@
+name: CI OpenTofu
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/tofu/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/tofu/**"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: opentofu/setup-opentofu@9d84900f3238fab8cd84ce47d658d25dd008be2f # v1
+        with:
+          tofu_wrapper: false
+      - name: tofu fmt
+        working-directory: deploy/tofu
+        run: tofu fmt -check -diff
+      - name: tofu init
+        working-directory: deploy/tofu
+        run: tofu init -backend=false
+      - name: tofu validate
+        working-directory: deploy/tofu
+        run: tofu validate
+      - uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
+      - name: tflint
+        working-directory: deploy/tofu
+        run: tflint --init && tflint

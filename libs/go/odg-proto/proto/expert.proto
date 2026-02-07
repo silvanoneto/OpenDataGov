@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package odg.proto.v1;
+
+option go_package = "github.com/silvanoneto/opendatagov/libs/go/odg-proto/gen/go/v1";
+
+import "google/protobuf/timestamp.proto";
+
+// ExpertRequest represents a query sent to an expert agent for analysis
+// or recommendation.
+message ExpertRequest {
+  string query = 1;
+  map<string, string> context = 2;
+  map<string, string> parameters = 3;
+}
+
+// ExpertResponse contains the expert agent's recommendation and supporting
+// information.
+message ExpertResponse {
+  string recommendation = 1;
+  float confidence = 2;
+  string reasoning = 3;
+  map<string, string> metadata = 4;
+  bool requires_approval = 5;
+}
+
+// ExpertRegistration represents the registration record for an expert agent
+// within the governance framework.
+message ExpertRegistration {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string endpoint = 4;
+  repeated string capabilities = 5;
+  bool is_active = 6;
+  google.protobuf.Timestamp registered_at = 7;
+  string approved_decision_id = 8;
+}

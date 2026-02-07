@@ -1,0 +1,27 @@
+name: CI Helm
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/helm/**"
+      - "deploy/kind/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/helm/**"
+      - "deploy/kind/**"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a # v4
+      - name: Helm lint
+        run: |
+          helm lint deploy/helm/opendatagov
+          helm lint deploy/helm/opendatagov -f deploy/kind/values-kind.yaml
+          helm lint deploy/helm/opendatagov -f deploy/helm/opendatagov/values-dev.yaml
+      - name: Helm template
+        run: helm template opendatagov deploy/helm/opendatagov

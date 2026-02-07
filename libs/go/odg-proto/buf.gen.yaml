@@ -1,0 +1,18 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/silvanoneto/opendatagov/libs/go/odg-proto/gen/go
+plugins:
+  # Go code generation
+  - remote: buf.build/protocolbuffers/go
+    out: gen/go
+    opt:
+      - paths=source_relative
+  # Python code generation
+  - remote: buf.build/protocolbuffers/python
+    out: gen/python
+  # Python gRPC stubs (pyi type hints)
+  - remote: buf.build/protocolbuffers/pyi
+    out: gen/python

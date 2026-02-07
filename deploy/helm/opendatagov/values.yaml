@@ -1,0 +1,204 @@
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# ─── Infrastructure ─────────────────────────────────────
+
+postgres:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  auth:
+    username: odg
+    password: odg
+    database: odg
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+redis:
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+minio:
+  image:
+    repository: minio/minio
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  auth:
+    rootUser: minioadmin
+    rootPassword: minioadmin
+  persistence:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+nats:
+  image:
+    repository: nats
+    tag: "2-alpine"
+    pullPolicy: IfNotPresent
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ─── Observability ──────────────────────────────────────
+
+otelCollector:
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+jaeger:
+  image:
+    repository: jaegertracing/all-in-one
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ─── Application Services ───────────────────────────────
+
+governanceEngine:
+  replicaCount: 1
+  image:
+    repository: opendatagov/governance-engine
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+      ephemeral-storage: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 256Mi
+  env:
+    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
+    REDIS_URL: "redis://{{ .Release.Name }}-redis:6379/0"
+    NATS_URL: "nats://{{ .Release.Name }}-nats:4222"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
+    OTEL_SERVICE_NAME: governance-engine
+
+lakehouseAgent:
+  replicaCount: 1
+  image:
+    repository: opendatagov/lakehouse-agent
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+      ephemeral-storage: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 256Mi
+  env:
+    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
+    MINIO_ENDPOINT: "{{ .Release.Name }}-minio:9000"
+    MINIO_ACCESS_KEY: minioadmin
+    MINIO_SECRET_KEY: minioadmin
+    MINIO_SECURE: "false"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
+    OTEL_SERVICE_NAME: lakehouse-agent
+
+dataExpert:
+  replicaCount: 1
+  image:
+    repository: opendatagov/data-expert
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+      ephemeral-storage: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 256Mi
+  env:
+    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
+    OTEL_SERVICE_NAME: data-expert
+
+gateway:
+  replicaCount: 1
+  image:
+    repository: opendatagov/gateway
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+      ephemeral-storage: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+      ephemeral-storage: 128Mi
+  env:
+    GATEWAY_PORT: "8080"
+    VLLM_BACKENDS: ""
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80

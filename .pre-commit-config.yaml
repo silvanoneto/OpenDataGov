@@ -1,0 +1,96 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]
+        exclude: ^deploy/helm/.*/templates/
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: debug-statements
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/hukkin/mdformat
+    rev: 0.7.21
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-gfm    # GitHub-flavored markdown (tables, task lists)
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.11.0-1
+    hooks:
+      - id: shfmt
+        args: [-i, '2', -ci]  # 2-space indent, indent case labels
+
+  - repo: https://github.com/tofuutils/pre-commit-opentofu
+    rev: v2.1.0
+    hooks:
+      - id: tofu_fmt
+        files: ^deploy/tofu/
+      - id: tofu_validate
+        files: ^deploy/tofu/
+      - id: tofu_tflint
+        files: ^deploy/tofu/
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: scripts/lint-python.sh
+        language: script
+        types: [python]
+        pass_filenames: false
+
+      - id: golangci-lint
+        name: golangci-lint
+        entry: bash -c 'command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed, skipping"; exit 0; }; cd services/gateway && golangci-lint run ./...'
+        language: system
+        files: ^services/gateway/.*\.go$
+        pass_filenames: false
+
+      - id: buf-lint
+        name: buf lint
+        entry: bash -c 'command -v buf >/dev/null 2>&1 || { echo "buf not installed, skipping"; exit 0; }; buf lint libs/go/odg-proto'
+        language: system
+        files: \.proto$
+        pass_filenames: false
+
+      - id: helm-lint
+        name: helm lint
+        entry: helm lint
+        language: system
+        files: ^deploy/helm/
+        args: [deploy/helm/opendatagov]
+        pass_filenames: false
+
+      - id: pytest-coverage
+        name: pytest coverage (≥95%)
+        entry: bash -c 'uv run pytest libs/python/odg-core/tests/ services/governance-engine/tests/ services/lakehouse-agent/tests/ services/data-expert/tests/ --import-mode=importlib --cov --cov-report=term-missing -q'
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: go-test-coverage
+        name: go test coverage (≥95%)
+        entry: scripts/check-go-coverage.sh
+        language: script
+        files: ^services/gateway/.*\.go$
+        pass_filenames: false
+        stages: [pre-push]

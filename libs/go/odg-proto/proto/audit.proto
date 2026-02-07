@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package odg.proto.v1;
+
+option go_package = "github.com/silvanoneto/opendatagov/libs/go/odg-proto/gen/go/v1";
+
+import "google/protobuf/timestamp.proto";
+
+// AuditEventType categorizes the kind of auditable event that occurred.
+enum AuditEventType {
+  AUDIT_EVENT_TYPE_UNSPECIFIED = 0;
+  AUDIT_EVENT_TYPE_DECISION_CREATED = 1;
+  AUDIT_EVENT_TYPE_DECISION_APPROVED = 2;
+  AUDIT_EVENT_TYPE_DECISION_REJECTED = 3;
+  AUDIT_EVENT_TYPE_DECISION_VETOED = 4;
+  AUDIT_EVENT_TYPE_DECISION_ESCALATED = 5;
+  AUDIT_EVENT_TYPE_VOTE_CAST = 6;
+  AUDIT_EVENT_TYPE_VETO_OVERRIDDEN = 7;
+  AUDIT_EVENT_TYPE_EXPERT_REGISTERED = 8;
+  AUDIT_EVENT_TYPE_EXPERT_DEREGISTERED = 9;
+  AUDIT_EVENT_TYPE_DATA_PROMOTED = 10;
+  AUDIT_EVENT_TYPE_SCHEMA_CHANGED = 11;
+  AUDIT_EVENT_TYPE_ACCESS_GRANTED = 12;
+  AUDIT_EVENT_TYPE_ACCESS_REVOKED = 13;
+  AUDIT_EVENT_TYPE_POLICY_CHANGED = 14;
+}
+
+// AuditEvent represents an immutable audit trail entry. Each event is
+// hash-chained to its predecessor to ensure tamper evidence.
+message AuditEvent {
+  string id = 1;
+  AuditEventType event_type = 2;
+  string entity_type = 3;
+  string entity_id = 4;
+  string actor_id = 5;
+  string description = 6;
+  map<string, string> details = 7;
+  google.protobuf.Timestamp occurred_at = 8;
+  string previous_hash = 9;
+  string event_hash = 10;
+}

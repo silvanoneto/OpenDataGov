@@ -1,0 +1,125 @@
+# ─── Infrastructure (kind) ───────────────────────────────
+
+postgres:
+  persistence:
+    size: 512Mi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+minio:
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+nats:
+  persistence:
+    size: 512Mi
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# ─── Observability (kind) ────────────────────────────────
+
+otelCollector:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+jaeger:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# ─── Application Services (kind) ─────────────────────────
+
+governanceEngine:
+  replicaCount: 1
+  image:
+    repository: opendatagov/governance-engine
+    tag: "0.1.0"
+    pullPolicy: Never
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+lakehouseAgent:
+  replicaCount: 1
+  image:
+    repository: opendatagov/lakehouse-agent
+    tag: "0.1.0"
+    pullPolicy: Never
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+dataExpert:
+  replicaCount: 1
+  image:
+    repository: opendatagov/data-expert
+    tag: "0.1.0"
+    pullPolicy: Never
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+gateway:
+  replicaCount: 1
+  image:
+    repository: opendatagov/gateway
+    tag: "0.1.0"
+    pullPolicy: Never
+  service:
+    type: NodePort
+    port: 8080
+    nodePort: 30080
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi

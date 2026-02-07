@@ -1,0 +1,19 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # Gateway (NodePort → localhost:8080)
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+      # Jaeger UI (NodePort → localhost:16686)
+      - containerPort: 30686
+        hostPort: 16686
+        protocol: TCP

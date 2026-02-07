@@ -1,0 +1,48 @@
+[project]
+name = "governance-engine"
+version = "0.1.0"
+description = "Core governance service for OpenDataGov"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+dependencies = [
+    "odg-core",
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "httpx>=0.27,<1.0",
+    "nats-py>=2.7,<3.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=1.0",
+    "pytest-cov>=7.0",
+    "httpx>=0.27",
+    "ruff>=0.15",
+    "mypy>=1.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/governance_engine"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["fastapi", "fastapi.*", "nats", "nats.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["governance_engine.api.*", "governance_engine.main"]
+disallow_untyped_decorators = false
+
+[tool.uv.sources]
+odg-core = { workspace = true }

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: opendatagov
+description: Open-source data governance platform with progressive AI capabilities
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

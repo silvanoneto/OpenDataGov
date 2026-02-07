@@ -1,0 +1,91 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/config"
+	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/health"
+	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/middleware"
+	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/proxy"
+)
+
+func main() {
+	cfg := config.LoadFromEnv()
+
+	log.Printf("gateway: starting on port %d with %d backend(s)", cfg.Port, len(cfg.Backends))
+	for i, b := range cfg.Backends {
+		log.Printf("gateway: backend[%d] = %s", i, b)
+	}
+
+	mux := http.NewServeMux()
+
+	// Register proxy routes.
+	proxyHandler, err := proxy.NewHandler(cfg.Backends)
+	if err != nil {
+		log.Fatalf("gateway: invalid backend configuration: %v", err)
+	}
+	proxyHandler.RegisterRoutes(mux)
+
+	// Register health/readiness routes.
+	healthHandler := health.NewHandler(cfg.Backends)
+	healthHandler.RegisterRoutes(mux)
+
+	// Start background health checker.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	healthHandler.StartBackgroundChecker(ctx)
+
+	// Wrap the mux with logging middleware.
+	handler := middleware.Logging(mux)
+
+	server := &http.Server{
+		Addr:         fmt.Sprintf(":%d", cfg.Port),
+		Handler:      handler,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Start the server in a goroutine.
+	errCh := make(chan error, 1)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+		close(errCh)
+	}()
+
+	log.Printf("gateway: listening on %s", server.Addr)
+
+	// Wait for interrupt signal or server error.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case sig := <-sigCh:
+		log.Printf("gateway: received signal %s, shutting down", sig)
+	case err := <-errCh:
+		if err != nil {
+			log.Printf("gateway: server error: %v", err)
+		}
+	}
+
+	// Graceful shutdown with a 15-second deadline.
+	cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("gateway: shutdown error: %v", err)
+		os.Exit(1)
+	}
+
+	log.Println("gateway: stopped")
+}
