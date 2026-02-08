@@ -74,6 +74,12 @@ class NATSPublisher:
             return
 
         try:
+            from odg_core.telemetry.context import get_trace_headers
+
+            trace_headers = get_trace_headers()
+            if trace_headers:
+                payload.setdefault("_trace", trace_headers)
+
             data = json.dumps(payload, default=str).encode()
             await self._js.publish(subject, data)
             logger.debug("Published event to %s", subject)

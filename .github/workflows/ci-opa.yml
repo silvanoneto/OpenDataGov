@@ -1,0 +1,37 @@
+name: CI OPA Policies
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "deploy/docker-compose/opa-policies/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "deploy/docker-compose/opa-policies/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install OPA
+        run: |
+          curl -L -o /usr/local/bin/opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x /usr/local/bin/opa
+
+      - name: Check policy syntax
+        run: |
+          for policy in deploy/docker-compose/opa-policies/*.rego; do
+            echo "Checking: $policy"
+            opa check "$policy"
+          done
+
+      - name: Run OPA tests (if any)
+        run: |
+          if ls deploy/docker-compose/opa-policies/*_test.rego 1>/dev/null 2>&1; then
+            opa test deploy/docker-compose/opa-policies/ -v
+          else
+            echo "No OPA test files found, skipping"
+          fi

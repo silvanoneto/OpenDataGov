@@ -1,0 +1,34 @@
+# AI Risk Classification Criteria (ADR-111)
+# Based on EU AI Act Annex III
+
+high_risk_indicators:
+  - biometric_identification
+  - critical_infrastructure
+  - education_scoring
+  - employment_decisions
+  - essential_services
+  - law_enforcement
+  - migration_control
+
+limited_risk_indicators:
+  - chatbot
+  - emotion_recognition
+  - deepfake_generation
+  - content_generation
+
+# Risk level → required controls mapping
+controls:
+  high:
+    - risk_management_system
+    - data_governance
+    - technical_documentation
+    - record_keeping
+    - transparency_info
+    - human_oversight
+    - accuracy_robustness
+    - conformity_assessment
+  limited:
+    - transparency_info
+    - user_notification
+  minimal:
+    - transparency_info

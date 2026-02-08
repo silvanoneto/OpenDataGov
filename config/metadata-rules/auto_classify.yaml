@@ -1,0 +1,23 @@
+description: Auto-classify PII columns based on naming patterns
+
+rules:
+  - name: detect_cpf
+    trigger: on_ingest
+    condition: "column matches cpf|ssn|social_security"
+    action: "set_pii=true"
+    auto_approve: true
+    description: "Detect CPF/SSN columns as PII"
+
+  - name: detect_email
+    trigger: on_ingest
+    condition: "column matches email|e_mail"
+    action: "set_pii=true"
+    auto_approve: true
+    description: "Detect email columns as PII"
+
+  - name: detect_phone
+    trigger: on_ingest
+    condition: "column matches phone|telefone|celular"
+    action: "set_pii=true"
+    auto_approve: true
+    description: "Detect phone columns as PII"

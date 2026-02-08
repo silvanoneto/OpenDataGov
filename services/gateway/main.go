@@ -14,6 +14,7 @@ import (
 	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/health"
 	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/middleware"
 	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/proxy"
+	"github.com/silvanoneto/OpenDataGov/services/gateway/internal/telemetry"
 )
 
 func main() {
@@ -22,6 +23,17 @@ func main() {
 	log.Printf("gateway: starting on port %d with %d backend(s)", cfg.Port, len(cfg.Backends))
 	for i, b := range cfg.Backends {
 		log.Printf("gateway: backend[%d] = %s", i, b)
+	}
+
+	// Initialize OpenTelemetry.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	otelProviders, err := telemetry.Init(ctx, "gateway", cfg.OTelEndpoint)
+	if err != nil {
+		log.Printf("gateway: OTel init failed (continuing without telemetry): %v", err)
+	} else {
+		log.Printf("gateway: OTel initialized → %s", cfg.OTelEndpoint)
 	}
 
 	mux := http.NewServeMux()
@@ -38,12 +50,10 @@ func main() {
 	healthHandler.RegisterRoutes(mux)
 
 	// Start background health checker.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	healthHandler.StartBackgroundChecker(ctx)
 
-	// Wrap the mux with logging middleware.
-	handler := middleware.Logging(mux)
+	// Wrap the mux with tracing and logging middleware.
+	handler := middleware.Logging(middleware.Tracing(mux))
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
@@ -85,6 +95,12 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("gateway: shutdown error: %v", err)
 		os.Exit(1)
+	}
+
+	if otelProviders != nil {
+		if err := otelProviders.Shutdown(shutdownCtx); err != nil {
+			log.Printf("gateway: OTel shutdown error: %v", err)
+		}
 	}
 
 	log.Println("gateway: stopped")

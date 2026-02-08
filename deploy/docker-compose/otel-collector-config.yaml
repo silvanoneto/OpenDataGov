@@ -11,14 +11,30 @@ processors:
     timeout: 5s
     send_batch_size: 1024
 
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  attributes/loki:
+    actions:
+      - action: insert
+        key: loki.attribute.labels
+        value: service.name,service.namespace
+
 exporters:
   otlp/jaeger:
     endpoint: jaeger:4317
     tls:
       insecure: true
 
-  prometheus:
-    endpoint: 0.0.0.0:8889
+  prometheusremotewrite:
+    endpoint: http://victoriametrics:8428/api/v1/write
+    tls:
+      insecure: true
+
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
 
   debug:
     verbosity: basic
@@ -27,9 +43,13 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [otlp/jaeger, debug]
     metrics:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [prometheus, debug]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite, debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/loki, batch]
+      exporters: [loki, debug]

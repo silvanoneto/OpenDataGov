@@ -1,0 +1,58 @@
+name: CI Contracts & Expectations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/contracts/**"
+      - "config/expectations/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "config/contracts/**"
+      - "config/expectations/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.13"
+      - name: Install odg-core
+        run: uv sync
+      - name: Validate contracts YAML
+        run: |
+          uv run python -c "
+          import yaml, sys
+          from pathlib import Path
+          errors = 0
+          for f in Path('config/contracts').glob('*.yaml'):
+              try:
+                  data = yaml.safe_load(f.read_text())
+                  assert 'name' in data, f'{f}: missing name'
+                  assert 'schema' in data, f'{f}: missing schema'
+                  print(f'  OK: {f}')
+              except Exception as e:
+                  print(f'  FAIL: {f}: {e}', file=sys.stderr)
+                  errors += 1
+          sys.exit(errors)
+          "
+      - name: Validate expectations YAML
+        run: |
+          uv run python -c "
+          import yaml, sys
+          from pathlib import Path
+          errors = 0
+          for f in Path('config/expectations').glob('*.yaml'):
+              try:
+                  data = yaml.safe_load(f.read_text())
+                  assert 'expectations' in data, f'{f}: missing expectations key'
+                  print(f'  OK: {f}')
+              except Exception as e:
+                  print(f'  FAIL: {f}: {e}', file=sys.stderr)
+                  errors += 1
+          sys.exit(errors)
+          "

@@ -1,0 +1,19 @@
+# Azure AKS-specific overrides
+global:
+  storageClass: managed-premium
+
+gateway:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-internal: "false"
+
+minio:
+  persistence:
+    storageClass: managed-premium
+    size: 50Gi
+
+postgres:
+  persistence:
+    storageClass: managed-premium
+    size: 20Gi

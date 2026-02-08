@@ -1,0 +1,17 @@
+# GCP GKE-specific overrides
+global:
+  storageClass: standard-rwo
+
+gateway:
+  service:
+    type: LoadBalancer
+
+minio:
+  persistence:
+    storageClass: standard-rwo
+    size: 50Gi
+
+postgres:
+  persistence:
+    storageClass: standard-rwo
+    size: 20Gi

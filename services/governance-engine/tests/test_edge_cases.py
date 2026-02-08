@@ -22,6 +22,8 @@ from odg_core.enums import (
 )
 from odg_core.models import PromotionMetadata
 
+from tests.conftest import MockDecisionRepository
+
 
 class TestDecisionServiceErrors:
     async def test_create_with_promotion_metadata(self, decision_service: DecisionService) -> None:
@@ -308,6 +310,59 @@ class TestVetoServiceErrors:
         await veto_service.exercise_veto(decision_id=decision.id, vetoed_by="r5", reason="Issue")
         vetoes = await veto_service.list_vetoes(decision.id)
         assert len(vetoes) == 1
+
+
+class TestApprovalAutoFinalizeEdgeCases:
+    async def test_approve_with_no_required_voters(
+        self,
+        decision_service: DecisionService,
+        approval_service: ApprovalService,
+        role_service: RoleService,
+    ) -> None:
+        """When domain only has CONSULTED roles, _check_and_finalize returns early."""
+        await role_service.assign_role(
+            user_id="c1", domain_id="noapprover", role=RACIRole.CONSULTED, assigned_by="admin"
+        )
+        decision = await decision_service.create_decision(
+            decision_type=DecisionType.SCHEMA_CHANGE,
+            title="Test no approvers",
+            description="",
+            domain_id="noapprover",
+            created_by="c1",
+        )
+        await decision_service.submit_for_approval(decision.id, "c1")
+        await approval_service.cast_vote(decision_id=decision.id, voter_id="c1", vote=VoteValue.APPROVE)
+        # Decision should NOT be auto-finalized (no required voters)
+        updated = await decision_service.get_decision(decision.id)
+        assert updated is not None
+        assert updated.status == DecisionStatus.AWAITING_APPROVAL
+
+
+class TestVetoOverrideDecisionMissing:
+    async def test_override_veto_decision_deleted(
+        self,
+        decision_service: DecisionService,
+        veto_service: VetoService,
+        role_service: RoleService,
+        decision_repo: MockDecisionRepository,
+    ) -> None:
+        """override_veto raises if the decision linked to the veto was removed."""
+        await role_service.assign_role(user_id="v1", domain_id="dv", role=RACIRole.RESPONSIBLE, assigned_by="admin")
+        await role_service.assign_role(user_id="a1", domain_id="dv", role=RACIRole.ACCOUNTABLE, assigned_by="admin")
+        decision = await decision_service.create_decision(
+            decision_type=DecisionType.SCHEMA_CHANGE,
+            title="Will be removed",
+            description="",
+            domain_id="dv",
+            created_by="v1",
+        )
+        await decision_service.submit_for_approval(decision.id, "v1")
+        veto = await veto_service.exercise_veto(decision_id=decision.id, vetoed_by="v1", reason="Test")
+        # Remove decision from repo to simulate missing decision
+        decision_repo._store.pop(decision.id)
+
+        with pytest.raises(ValueError, match="not found"):
+            await veto_service.override_veto(veto_id=veto.id, overridden_by="a1")
 
 
 class TestAuditServiceEdgeCases:

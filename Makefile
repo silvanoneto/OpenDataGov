@@ -1,13 +1,16 @@
-.PHONY: help install lint lint-python lint-go lint-tofu lint-md test test-python test-go build compose-up compose-down compose-full-up compose-full-down compose-logs kind-up kind-down kind-load tofu-init tofu-apply tofu-destroy proto clean
+.PHONY: help install lint lint-python lint-go lint-tofu lint-md test test-python test-go build compose-up compose-down compose-full-up compose-full-down compose-datahub-up compose-datahub-down compose-auth-up compose-auth-down compose-vault-up compose-vault-down compose-all-up compose-logs quick-start full-test airgap-sim airgap-bundle compliance-check kind-up kind-down kind-load tofu-init tofu-apply tofu-destroy proto clean
 
-PYTHON_SERVICES := libs/python/odg-core services/governance-engine services/lakehouse-agent services/data-expert
+PYTHON_SERVICES := libs/python/odg-core services/governance-engine services/lakehouse-agent services/data-expert services/quality-gate
 GO_SERVICES := services/gateway
 
 COMPOSE_FILE := deploy/docker-compose/docker-compose.yml
 COMPOSE_FULL := deploy/docker-compose/docker-compose.full.yml
+COMPOSE_DATAHUB := deploy/docker-compose/docker-compose.datahub.yml
+COMPOSE_AUTH := deploy/docker-compose/docker-compose.auth.yml
+COMPOSE_VAULT := deploy/docker-compose/docker-compose.vault.yml
 KIND_CLUSTER := opendatagov
 TOFU_DIR := deploy/tofu
-APP_IMAGES := opendatagov/governance-engine opendatagov/lakehouse-agent opendatagov/data-expert opendatagov/gateway
+APP_IMAGES := opendatagov/governance-engine opendatagov/lakehouse-agent opendatagov/data-expert opendatagov/quality-gate opendatagov/gateway
 
 install: ## Set up local dev environment
 	@./scripts/setup-dev.sh
@@ -85,8 +88,61 @@ compose-full-up: ## Start full stack (with Kafka, Grafana, VictoriaMetrics)
 compose-full-down: ## Stop full stack
 	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) down
 
+compose-datahub-up: ## Start DataHub catalog stack
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) -f $(COMPOSE_DATAHUB) up -d
+
+compose-datahub-down: ## Stop DataHub catalog stack
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) -f $(COMPOSE_DATAHUB) down
+
+compose-auth-up: ## Start auth stack (Keycloak + OPA)
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_AUTH) up -d
+
+compose-auth-down: ## Stop auth stack
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_AUTH) down
+
+compose-vault-up: ## Start Vault stack
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_VAULT) up -d
+
+compose-vault-down: ## Stop Vault stack
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_VAULT) down
+
+compose-all-up: ## Start all stacks
+	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) -f $(COMPOSE_DATAHUB) -f $(COMPOSE_AUTH) -f $(COMPOSE_VAULT) up -d
+
 compose-logs: ## Tail logs from all services
 	docker compose -f $(COMPOSE_FILE) logs -f
+
+# ─── Quick Start ─────────────────────────────────────────
+
+quick-start: ## Start base stack and wait for healthy services
+	@echo "==> Starting OpenDataGov base stack..."
+	docker compose -f $(COMPOSE_FILE) up -d
+	@echo "==> Waiting for services to be healthy..."
+	@for i in $$(seq 1 30); do \
+		if docker compose -f $(COMPOSE_FILE) ps --format '{{.Status}}' | grep -q "unhealthy\|starting"; then \
+			printf "."; sleep 2; \
+		else \
+			echo ""; echo "==> All services healthy!"; \
+			docker compose -f $(COMPOSE_FILE) ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}'; \
+			exit 0; \
+		fi; \
+	done; \
+	echo ""; echo "==> Timeout waiting for services. Current status:"; \
+	docker compose -f $(COMPOSE_FILE) ps
+
+# ─── Full Test + Air-Gap ─────────────────────────────────
+
+full-test: ## Run full integration test (unit + compose + kind)
+	@./scripts/full-test.sh
+
+airgap-bundle: build ## Create air-gap image bundle
+	@./deploy/scripts/airgap-bundle.sh
+
+airgap-sim: ## Simulate air-gapped deployment
+	@./scripts/airgap-simulate.sh
+
+compliance-check: ## Run compliance checks on odg-core
+	@cd libs/python/odg-core && uv run python -c "from odg_core.compliance.registry import create_default_registry; r = create_default_registry(); print(r)"
 
 # ─── Kind + Tofu ─────────────────────────────────────────
 

@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opendatagov
+  namespace: argocd
+spec:
+  project: opendatagov
+  source:
+    repoURL: https://github.com/silvanoneto/opendatagov.git
+    targetRevision: HEAD
+    path: deploy/helm/opendatagov
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: opendatagov
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

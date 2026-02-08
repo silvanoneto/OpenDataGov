@@ -9,6 +9,7 @@ Promotion rules (ADR-024):
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import Any
 
@@ -74,13 +75,14 @@ class _GovernancePromotionStrategy:
 
     async def execute(
         self,
-        bucket_manager: BucketManager,
-        domain_id: str,
+        _bucket_manager: BucketManager,
+        _domain_id: str,
         source_layer: MedallionLayer,
         target_layer: MedallionLayer,
         dataset_id: str,
         dq_score: float,
     ) -> dict[str, Any]:
+        await asyncio.sleep(0)  # Cooperative yield; real impl will call governance API
         governance_decision_id = str(uuid.uuid4())
 
         return {
@@ -161,12 +163,12 @@ class PromotionService:
 
         strategy = _STRATEGIES[(source_layer, target_layer)]
         return await strategy.execute(
-            bucket_manager=self._bucket_manager,
-            domain_id=domain_id,
-            source_layer=source_layer,
-            target_layer=target_layer,
-            dataset_id=dataset_id,
-            dq_score=dq_score,
+            self._bucket_manager,
+            domain_id,
+            source_layer,
+            target_layer,
+            dataset_id,
+            dq_score,
         )
 
 

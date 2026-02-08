@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: opendatagov
+  namespace: argocd
+spec:
+  description: OpenDataGov platform
+  sourceRepos:
+    - "https://github.com/silvanoneto/opendatagov.git"
+  destinations:
+    - namespace: opendatagov
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

@@ -1,0 +1,45 @@
+name: revenue_dataset
+dataset_id: finance/revenue
+domain_id: finance
+owner_id: data-engineering-team
+jurisdiction: br
+
+schema:
+  columns:
+    - name: id
+      data_type: string
+      nullable: false
+      description: Unique revenue record identifier
+    - name: amount
+      data_type: float
+      nullable: false
+      description: Revenue amount in BRL
+    - name: category
+      data_type: string
+      nullable: false
+      description: Revenue category
+    - name: source
+      data_type: string
+      nullable: true
+      description: Revenue source system
+      pii: false
+    - name: customer_cpf
+      data_type: string
+      nullable: true
+      description: Customer CPF (masked in silver+)
+      pii: true
+    - name: created_at
+      data_type: timestamp
+      nullable: false
+      description: Record creation timestamp
+    - name: updated_at
+      data_type: timestamp
+      nullable: false
+      description: Last update timestamp
+  primary_key:
+    - id
+
+sla:
+  freshness_hours: 24
+  completeness_threshold: 0.95
+  availability_percent: 99.5

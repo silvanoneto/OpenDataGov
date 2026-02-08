@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 _FK_GOVERNANCE_DECISION = "governance_decisions.id"
+_CASCADE_ALL_DELETE_ORPHAN = "all, delete-orphan"
 
 
 class Base(DeclarativeBase):
@@ -43,8 +44,10 @@ class GovernanceDecisionRow(Base):
     target_layer: Mapped[str | None] = mapped_column(String(20))
     data_classification: Mapped[str | None] = mapped_column(String(20))
 
-    approvals: Mapped[list[ApprovalRecordRow]] = relationship(back_populates="decision", cascade="all, delete-orphan")
-    vetoes: Mapped[list[VetoRecordRow]] = relationship(back_populates="decision", cascade="all, delete-orphan")
+    approvals: Mapped[list[ApprovalRecordRow]] = relationship(
+        back_populates="decision", cascade=_CASCADE_ALL_DELETE_ORPHAN
+    )
+    vetoes: Mapped[list[VetoRecordRow]] = relationship(back_populates="decision", cascade=_CASCADE_ALL_DELETE_ORPHAN)
 
     __table_args__ = (Index("ix_decisions_status_domain", "status", "domain_id"),)
 
@@ -126,3 +129,85 @@ class ExpertRegistryRow(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     approved_decision_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(_FK_GOVERNANCE_DECISION))
+
+
+class QualityReportRow(Base):
+    """Quality gate evaluation reports (ADR-050)."""
+
+    __tablename__ = "quality_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    dataset_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    domain_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    layer: Mapped[str] = mapped_column(String(20), nullable=False)
+    suite_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    dq_score: Mapped[float] = mapped_column(nullable=False)
+    dimension_scores: Mapped[dict[str, object] | None] = mapped_column(JSONB, default=dict)
+    expectations_passed: Mapped[int] = mapped_column(nullable=False, default=0)
+    expectations_failed: Mapped[int] = mapped_column(nullable=False, default=0)
+    expectations_total: Mapped[int] = mapped_column(nullable=False, default=0)
+    report_details: Mapped[dict[str, object] | None] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    triggered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(_FK_GOVERNANCE_DECISION))
+
+    __table_args__ = (Index("ix_quality_reports_dataset_layer", "dataset_id", "layer"),)
+
+
+class QualitySLARow(Base):
+    """Quality SLA thresholds per dimension (ADR-052)."""
+
+    __tablename__ = "quality_slas"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    dataset_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    domain_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    dimension: Mapped[str] = mapped_column(String(30), nullable=False)
+    threshold: Mapped[float] = mapped_column(nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    review_interval_days: Mapped[int] = mapped_column(nullable=False, default=90)
+    last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_quality_slas_dataset_dim", "dataset_id", "dimension", unique=True),)
+
+
+class DataContractRow(Base):
+    """Data contracts for datasets (ADR-051)."""
+
+    __tablename__ = "data_contracts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    dataset_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    domain_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    owner_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    schema_definition: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=False)
+    sla_definition: Mapped[dict[str, object] | None] = mapped_column(JSONB, default=dict)
+    jurisdiction: Mapped[str | None] = mapped_column(String(20))
+    version: Mapped[int] = mapped_column(nullable=False, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
+
+    versions: Mapped[list[ContractVersionRow]] = relationship(
+        back_populates="contract", cascade=_CASCADE_ALL_DELETE_ORPHAN
+    )
+
+    __table_args__ = (Index("ix_data_contracts_domain", "domain_id"),)
+
+
+class ContractVersionRow(Base):
+    """Versioned snapshots of data contracts (ADR-051)."""
+
+    __tablename__ = "contract_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    contract_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("data_contracts.id"), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(nullable=False)
+    schema_definition: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=False)
+    change_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    changed_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    contract: Mapped[DataContractRow] = relationship(back_populates="versions")

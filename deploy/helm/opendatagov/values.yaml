@@ -197,8 +197,52 @@ gateway:
     VLLM_BACKENDS: ""
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
 
+qualityGate:
+  replicaCount: 1
+  image:
+    repository: opendatagov/quality-gate
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8003
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+      ephemeral-storage: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 256Mi
+  env:
+    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
+    OTEL_SERVICE_NAME: quality-gate
+
+# ─── Feature Flags (Fase 2) ──────────────────────────────
+
+features:
+  datahub: false
+  keycloak: false
+  opa: false
+  vault: false
+  loki: true
+  kafkaUi: true
+
+# ─── Autoscaling ──────────────────────────────────────────
+
 autoscaling:
   enabled: false
   minReplicas: 1
   maxReplicas: 5
   targetCPUUtilizationPercentage: 80
+
+# ─── KEDA Event-driven Scaling (ADR-083) ──────────────────
+
+keda:
+  enabled: false
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicas: 1
+  maxReplicas: 10

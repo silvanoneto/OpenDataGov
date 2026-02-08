@@ -176,3 +176,82 @@ class ExpertRegistration(BaseModel):
     is_active: bool = Field(default=False)
     registered_at: datetime = Field(default_factory=_utcnow)
     approved_decision_id: uuid.UUID | None = None
+
+
+class QualityReport(BaseModel):
+    """Quality gate evaluation report (ADR-050)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    dataset_id: str = Field(min_length=1, max_length=200)
+    domain_id: str = Field(min_length=1, max_length=100)
+    layer: str = Field(min_length=1, max_length=20)
+    suite_name: str = Field(min_length=1, max_length=200)
+    dq_score: float = Field(ge=0.0, le=1.0)
+    dimension_scores: dict[str, float] = Field(default_factory=dict)
+    expectations_passed: int = Field(default=0, ge=0)
+    expectations_failed: int = Field(default=0, ge=0)
+    expectations_total: int = Field(default=0, ge=0)
+    report_details: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=_utcnow)
+    triggered_by: uuid.UUID | None = None
+
+
+class QualitySLA(BaseModel):
+    """Quality SLA threshold per DAMA dimension (ADR-052)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    dataset_id: str = Field(min_length=1, max_length=200)
+    domain_id: str = Field(min_length=1, max_length=100)
+    dimension: str = Field(min_length=1, max_length=30)
+    threshold: float = Field(ge=0.0, le=1.0)
+    owner_id: str = Field(min_length=1, max_length=200)
+    review_interval_days: int = Field(default=90, ge=1)
+    last_reviewed_at: datetime | None = None
+
+
+class ColumnDefinition(BaseModel):
+    """Column definition within a data contract schema (ADR-051)."""
+
+    name: str = Field(min_length=1, max_length=200)
+    data_type: str = Field(min_length=1, max_length=50)
+    nullable: bool = Field(default=True)
+    description: str = Field(default="")
+    pii: bool = Field(default=False)
+
+
+class DataContractSchema(BaseModel):
+    """Schema definition within a data contract (ADR-051)."""
+
+    columns: list[ColumnDefinition] = Field(default_factory=list)
+    primary_key: list[str] = Field(default_factory=list)
+
+
+class SLADefinition(BaseModel):
+    """SLA definition within a data contract (ADR-051)."""
+
+    freshness_hours: float | None = None
+    completeness_threshold: float = Field(default=0.95, ge=0.0, le=1.0)
+    availability_percent: float = Field(default=99.0, ge=0.0, le=100.0)
+
+
+class DataContract(BaseModel):
+    """Data contract for a dataset (ADR-051)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    name: str = Field(min_length=1, max_length=200)
+    dataset_id: str = Field(min_length=1, max_length=200)
+    domain_id: str = Field(min_length=1, max_length=100)
+    owner_id: str = Field(min_length=1, max_length=200)
+    schema_definition: DataContractSchema = Field(default_factory=DataContractSchema)
+    sla_definition: SLADefinition = Field(default_factory=SLADefinition)
+    jurisdiction: str | None = None
+    version: int = Field(default=1, ge=1)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)

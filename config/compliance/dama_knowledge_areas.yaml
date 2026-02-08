@@ -1,0 +1,68 @@
+# DAMA DMBOK Knowledge Areas → ODG Components Mapping (ADR-113)
+
+knowledge_areas:
+  data_governance:
+    description: Planning, oversight, and control of data management
+    components: [governance-engine, RACI workflow, audit trail]
+    adrs: [ADR-010, ADR-011, ADR-013, ADR-014]
+    coverage: full
+
+  data_quality:
+    description: Ensuring data fitness for use
+    components: [quality-gate, Great Expectations, DAMA 6 dimensions, SLAs]
+    adrs: [ADR-050, ADR-051, ADR-052]
+    coverage: full
+
+  metadata_management:
+    description: Managing data about data
+    components: [DataHub, metadata adapter, active metadata]
+    adrs: [ADR-040, ADR-041, ADR-042]
+    coverage: full
+
+  data_architecture:
+    description: Data structures and integration blueprint
+    components: [Medallion Architecture, data contracts]
+    adrs: [ADR-024, ADR-051]
+    coverage: full
+
+  data_modeling:
+    description: Discovering, analyzing, and representing data requirements
+    components: [data contracts, schema validation, breaking change detection]
+    adrs: [ADR-051]
+    coverage: full
+
+  data_storage:
+    description: Managing data storage and data throughout lifecycle
+    components: [MinIO (S3), PostgreSQL, Redis]
+    adrs: [ADR-024]
+    coverage: full
+
+  data_security:
+    description: Ensuring data privacy, confidentiality, and access
+    components: [Keycloak, OPA, Vault, PII masking, classification]
+    adrs: [ADR-070, ADR-071, ADR-072, ADR-073, ADR-074]
+    coverage: full
+
+  data_integration:
+    description: Managing data movement and consolidation
+    components: [NATS JetStream, Kafka, OpenLineage, OTel]
+    adrs: [ADR-060, ADR-061, ADR-062]
+    coverage: full
+
+  reference_data:
+    description: Managing shared data to reduce redundancy
+    components: [DataHub catalog, enriched metadata]
+    adrs: [ADR-040]
+    coverage: partial
+
+  data_warehousing:
+    description: Managing analytical data processing
+    components: [lakehouse-agent, promotion pipeline]
+    adrs: [ADR-024]
+    coverage: full
+
+  document_management:
+    description: Managing unstructured data and documents
+    components: []
+    adrs: []
+    coverage: none

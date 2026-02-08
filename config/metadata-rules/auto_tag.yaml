@@ -1,0 +1,16 @@
+description: Auto-tag datasets based on domain patterns
+
+rules:
+  - name: tag_financial
+    trigger: on_ingest
+    condition: "column matches revenue|amount|price|cost"
+    action: "add_tag=financial"
+    auto_approve: false
+    description: "Suggest financial tag for revenue/pricing columns"
+
+  - name: tag_temporal
+    trigger: on_ingest
+    condition: "column matches created_at|updated_at|timestamp|date"
+    action: "add_tag=temporal"
+    auto_approve: true
+    description: "Tag temporal columns automatically"

@@ -8,6 +8,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from odg_core.settings import MinIOSettings
+from odg_core.telemetry import init_telemetry, shutdown_telemetry
+from odg_core.telemetry.middleware import instrument_fastapi
 
 from lakehouse_agent.api.routes_buckets import router as bucket_router
 from lakehouse_agent.api.routes_promotion import router as catalog_router
@@ -21,7 +23,9 @@ _DEFAULT_DOMAIN = "default"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Manage application lifecycle: MinIO client startup / shutdown."""
+    """Manage application lifecycle: OTel + MinIO client startup / shutdown."""
+    init_telemetry("lakehouse-agent")
+
     settings = MinIOSettings()
     bucket_manager = MinIOBucketManager(settings)
 
@@ -39,12 +43,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     yield
 
+    shutdown_telemetry()
+
 
 app = FastAPI(
     title="OpenDataGov Lakehouse Agent",
     version="0.1.0",
     lifespan=lifespan,
 )
+
+instrument_fastapi(app)
 
 app.include_router(bucket_router)
 app.include_router(catalog_router)

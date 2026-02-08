@@ -95,3 +95,44 @@ class ExpertCapability(StrEnum):
     DATA_ANALYSIS = "data_analysis"
     DATA_PROFILING = "data_profiling"
     SCHEMA_INFERENCE = "schema_inference"
+    METADATA_DISCOVERY = "metadata_discovery"
+
+
+class DAMADimension(StrEnum):
+    """DAMA DMBOK data quality dimensions (ADR-052)."""
+
+    COMPLETENESS = "completeness"
+    ACCURACY = "accuracy"
+    CONSISTENCY = "consistency"
+    TIMELINESS = "timeliness"
+    UNIQUENESS = "uniqueness"
+    VALIDITY = "validity"
+
+
+class ComplianceFramework(StrEnum):
+    """Supported compliance frameworks (ADR-110)."""
+
+    LGPD = "lgpd"
+    GDPR = "gdpr"
+    EU_AI_ACT = "eu_ai_act"
+    NIST_AI_RMF = "nist_ai_rmf"
+    ISO_42001 = "iso_42001"
+    SOX = "sox"
+    DAMA_DMBOK = "dama_dmbok"
+
+
+class AIRiskLevel(StrEnum):
+    """EU AI Act risk classification levels (ADR-111)."""
+
+    HIGH = "high"
+    LIMITED = "limited"
+    MINIMAL = "minimal"
+
+
+class Jurisdiction(StrEnum):
+    """Data jurisdiction for residency and compliance (ADR-074)."""
+
+    BR = "br"
+    EU = "eu"
+    US = "us"
+    GLOBAL = "global"

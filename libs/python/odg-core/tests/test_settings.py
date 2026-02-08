@@ -37,3 +37,4 @@ class TestSettingsDefaults:
         settings = OTelSettings()
         assert "4317" in settings.exporter_otlp_endpoint
         assert settings.service_name == "opendatagov"
+        assert settings.enabled is True

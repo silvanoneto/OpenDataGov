@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: opendatagov
+spec:
+  project: opendatagov
+  source:
+    repoURL: https://github.com/silvanoneto/opendatagov.git
+    targetRevision: HEAD
+    path: deploy/helm/opendatagov
+    helm:
+      valueFiles:
+        - values.yaml
+      parameters:
+        - name: gateway.enabled
+          value: "true"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: opendatagov
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

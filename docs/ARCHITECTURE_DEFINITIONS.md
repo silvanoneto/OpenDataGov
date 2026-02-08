@@ -3,7 +3,7 @@
 <!--
 document_metadata:
   version: "0.1.0"
-  status: DRAFT
+  status: COMPLETE
   created: 2025-02-07
   authors:
     - role: human_architect
@@ -12,8 +12,8 @@ document_metadata:
       name: Claude (Opus 4.6)
   source_template: RADaC (.radac/)
   total_adrs: 50
-  decided: 0
-  open: 50
+  decided: 50
+  open: 0
   deferred: 0
 -->
 
@@ -59,8 +59,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-001
   domain: identity
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Plataforma completa + AI progressiva (b)+(c)"
   priority: P0
   radac_baseline: "Plataforma completa para auditoria e gestão de dados críticos, combinando metodologia estruturada, infraestrutura lakehouse moderna e inteligência artificial distribuída"
   references: ["DAMA-DMBOK", "Data Mesh self-serve platform"]
@@ -92,8 +92,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-002
   domain: identity
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Single-org, 10-100TB/dia, air-gapped, multi-setor"
   priority: P0
   radac_baseline: "Data engineers com a metodologia de auditoria sugerindo cenários de consultoria enterprise"
   references: ["DCAM v3 maturity levels"]
@@ -129,8 +129,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-003
   domain: identity
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Apache-2.0"
   priority: P0
   radac_baseline: "AGPL 3.0"
   references: ["AGPL-3.0", "Apache-2.0", "BSL 1.1", "SSPL"]
@@ -160,8 +160,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-004
   domain: identity
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Clean-room redesign (RADaC como referência)"
   priority: P0
   radac_baseline: "RADaC é o template fonte dentro de .radac/"
   references: []
@@ -193,8 +193,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-010
   domain: governance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Híbrida configurável"
   priority: P0
   radac_baseline: "Modelo de 5 representações com votação ponderada por tipo de decisão"
   references: ["Data Mesh - Zhamak Dehghani", "DAMA-DMBOK Cap.3", "Data Fabric - Gartner"]
@@ -230,8 +230,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-011
   domain: governance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "IA recomenda, humano decide (tudo requer humano)"
   priority: P0
   radac_baseline: "Representações são abstratas — votes vêm de entidades 'representation', não explicitamente humanos ou agentes IA"
   references: ["EU AI Act Art. 14 (human oversight)", "NIST AI RMF 2.0"]
@@ -267,8 +267,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-012
   domain: governance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Governança abrangente (dados + IA + infra)"
   priority: P0
   radac_baseline: "Atualmente governa roteamento de experts e 'decisões' abstratas — não cobre governança de pipelines de dados"
   references: ["DAMA-DMBOK 11 knowledge areas", "Data Contracts"]
@@ -304,8 +304,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-013
   domain: governance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "RACI/Stewardship (substituir 5 representações)"
   priority: P0
   radac_baseline: "5 representações hardcoded: POLITICA, ECONOMICA, GEOGRAFICA, CIENTIFICA, MILITAR"
   references: ["RACI matrix", "Data Stewardship models"]
@@ -350,8 +350,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-014
   domain: governance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Veto configurável com defaults"
   priority: P0
   radac_baseline: "Veto por domínio, override com 80% supermaioria, escalonamento para COSMOS"
   references: ["EU AI Act Art. 14", "NIST AI RMF GOVERN function"]
@@ -381,8 +381,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-020
   domain: data_architecture
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Lakehouse + Mesh + Fabric"
   priority: P0
   radac_baseline: "Lakehouse puro com camadas Bronze/Silver/Gold"
   references: ["Data Lakehouse - Databricks", "Data Mesh - Zhamak Dehghani", "Data Fabric - Gartner"]
@@ -418,8 +418,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-021
   domain: data_architecture
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Iceberg + UniForm/XTable"
   priority: P0
   radac_baseline: "Iceberg (default) com Delta Lake para CDC intensivo"
   references: ["Apache Iceberg", "Delta Lake 4.0", "Apache Hudi", "UniForm/XTable"]
@@ -449,8 +449,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-022
   domain: data_architecture
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "MinIO everywhere"
   priority: P0
   radac_baseline: "S3 nativo (AWS) com MinIO para testes locais"
   references: ["S3 API", "MinIO", "GCS", "Azure Blob"]
@@ -480,8 +480,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-023
   domain: data_architecture
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "5 datastores por temperatura"
   priority: P0
   radac_baseline: "Diagrama mermaid lista 11 datastores; deploy real tem apenas PostgreSQL, Redis e MinIO"
   references: ["Hot/Warm/Cold storage patterns"]
@@ -517,8 +517,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-024
   domain: data_architecture
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "4 camadas (Bronze/Silver/Gold/Platinum) + DQ gates"
   priority: P0
   radac_baseline: "3 buckets S3: raw (Bronze), staging (Silver), curated (Gold)"
   references: ["Medallion Architecture - Databricks", "Data Quality Gates"]
@@ -566,8 +566,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-030
   domain: ai_ml
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Híbrido: B-Swarm governance + MLOps"
   priority: P0
   radac_baseline: "Full B-Swarm com 6 experts (NLP, RAG, Code, Vision, Data, IoT)"
   references: ["MLflow 3", "Kubeflow", "MLOps in 2026"]
@@ -597,8 +597,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-031
   domain: ai_ml
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "vLLM + LiteLLM Gateway"
   priority: P0
   radac_baseline: "vLLM para NLP e Code experts"
   references: ["vLLM", "TGI", "Ollama", "LiteLLM", "llama.cpp"]
@@ -634,8 +634,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-032
   domain: ai_ml
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "MLflow + B-Swarm governance"
   priority: P0
   radac_baseline: "Inexistente — nomes de modelos hardcoded em Helm values"
   references: ["MLflow 3", "Weights & Biases", "Model Cards - Google"]
@@ -665,8 +665,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-033
   domain: ai_ml
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Qdrant standalone"
   priority: P0
   radac_baseline: "Qdrant + Sentence-Transformers"
   references: ["Qdrant", "pgvector", "Milvus", "Weaviate"]
@@ -702,8 +702,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-034
   domain: ai_ml
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Registry + approval flow"
   priority: P0
   radac_baseline: "Registro estático em ExpertRegistry._register_defaults()"
   references: ["Plugin architectures", "SPI pattern"]
@@ -735,8 +735,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-040
   domain: metadata
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "DataHub"
   priority: P1
   radac_baseline: "DataHub"
   references: ["DataHub", "OpenMetadata", "Apache Atlas", "Amundsen"]
@@ -766,8 +766,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-041
   domain: metadata
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Adapter layer de metadados"
   priority: P1
   radac_baseline: "Sem modelo de metadados explícito além do que DataHub fornece"
   references: ["OpenLineage schema", "DataHub entity model", "Dublin Core"]
@@ -797,8 +797,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-042
   domain: metadata
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Híbrido — regras declarativas + IA para descoberta"
   priority: P1
   radac_baseline: "Inexistente"
   references: ["Data Fabric - Gartner", "Active Metadata Management"]
@@ -830,8 +830,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-050
   domain: data_quality
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Great Expectations"
   priority: P1
   radac_baseline: "Inexistente — sem framework de qualidade"
   references: ["Great Expectations", "Soda", "dbt tests", "Elementary"]
@@ -862,8 +862,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-051
   domain: data_quality
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "DataContract Specification YAML + governança RACI"
   priority: P1
   radac_baseline: "Inexistente"
   references: ["DataContract Specification (GitHub)", "Data Contracts - Andrew Jones"]
@@ -900,8 +900,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-052
   domain: data_quality
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "6 dimensões DAMA obrigatórias por dataset"
   priority: P1
   radac_baseline: "Metas da metodologia de auditoria: uptime >99%, incidentes <1/mês, detecção <5min"
   references: ["DAMA-DMBOK quality dimensions", "ISO 25012"]
@@ -931,8 +931,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-060
   domain: lineage
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "OpenLineage → DataHub"
   priority: P1
   radac_baseline: "DataHub para lineage (sem OpenLineage)"
   references: ["OpenLineage", "DataHub lineage", "Marquez"]
@@ -962,8 +962,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-061
   domain: observability
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Convergência via OpenTelemetry"
   priority: P1
   radac_baseline: "VictoriaMetrics + Grafana + Jaeger + Alertmanager"
   references: ["OpenTelemetry", "VictoriaMetrics", "Grafana"]
@@ -992,8 +992,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-062
   domain: observability
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "OTel everywhere"
   priority: P1
   radac_baseline: "Jaeger direto para tracing, Prometheus-compatible para métricas"
   references: ["OpenTelemetry", "OTLP"]
@@ -1022,8 +1022,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-063
   domain: observability
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Integrado com DQ engine (Great Expectations) + Grafana"
   priority: P1
   radac_baseline: "Inexistente como conceito separado"
   references: ["Monte Carlo", "Elementary", "Data Observability Engines"]
@@ -1055,8 +1055,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-070
   domain: privacy
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "DP + RBAC + masking"
   priority: P1
   radac_baseline: "Differential privacy com OpenDP, epsilon por camada social"
   references: ["OpenDP", "LGPD", "GDPR", "Differential Privacy - Dwork & Roth"]
@@ -1086,8 +1086,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-071
   domain: privacy
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Mapear para classificação padrão governo/enterprise"
   priority: P1
   radac_baseline: "5 camadas: PESSOAL, FAMILIA, COMUNIDADE, CLASSE, COSMOS"
   references: ["Data Classification Standards", "NIST SP 800-60"]
@@ -1128,8 +1128,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-072
   domain: security
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Keycloak + OPA"
   priority: P1
   radac_baseline: "OIDC para IRSA (Terraform), RBAC mencionado mas access_control.py é mínimo"
   references: ["Keycloak", "Zitadel", "OIDC", "OPA"]
@@ -1165,8 +1165,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-073
   domain: security
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Vault + mTLS via service mesh"
   priority: P1
   radac_baseline: "Sem implementação explícita de criptografia"
   references: ["AWS KMS", "HashiCorp Vault", "SOPS"]
@@ -1192,8 +1192,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-074
   domain: security
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Awareness jurisdicional built-in"
   priority: P1
   radac_baseline: "Representação GEOGRAFICA e COSMOS federation implicam awareness jurisdicional"
   references: ["LGPD", "GDPR", "Data Sovereignty"]
@@ -1220,8 +1220,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-080
   domain: infrastructure
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Cloud-agnostic (Kind/K3s referência)"
   priority: P1
   radac_baseline: "EKS (AWS) com Kind para testes locais"
   references: ["EKS", "GKE", "AKS", "OpenShift", "K3s"]
@@ -1251,8 +1251,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-081
   domain: infrastructure
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "OpenTofu + Helm"
   priority: P1
   radac_baseline: "Terraform + Helm"
   references: ["Terraform", "Pulumi", "Crossplane", "Helm"]
@@ -1282,8 +1282,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-082
   domain: infrastructure
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "ArgoCD + governança RACI"
   priority: P1
   radac_baseline: "Sem GitOps — deploy via helm install manual"
   references: ["ArgoCD", "Flux"]
@@ -1313,8 +1313,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-083
   domain: infrastructure
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Cluster Autoscaler + KEDA"
   priority: P1
   radac_baseline: "Karpenter com Spot Instances"
   references: ["Karpenter", "KEDA", "Cluster Autoscaler"]
@@ -1343,8 +1343,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-084
   domain: infrastructure
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Múltiplos modos — Docker Compose + Kind"
   priority: P1
   radac_baseline: "Kind cluster com MinIO, PostgreSQL, Hive Metastore"
   references: ["Kind", "Docker Compose", "Tilt", "Skaffold"]
@@ -1376,8 +1376,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-090
   domain: api
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "REST + GraphQL + gRPC"
   priority: P2
   radac_baseline: "REST via FastAPI"
   references: ["REST", "gRPC", "GraphQL", "FastAPI"]
@@ -1407,8 +1407,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-091
   domain: api
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Kafka + NATS"
   priority: P2
   radac_baseline: "Kafka via Strimzi KRaft para streaming de dados; diagrama mermaid mostra NATS e RabbitMQ mas não implementados"
   references: ["Apache Kafka", "NATS", "RabbitMQ"]
@@ -1437,8 +1437,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-092
   domain: api
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "HTTP/gRPC para COSMOS"
   priority: P2
   radac_baseline: "Mock HTTP backend; design menciona libp2p"
   references: ["libp2p", "Matrix Protocol", "NATS"]
@@ -1468,8 +1468,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-093
   domain: api
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Python SDK + CLI + OpenTofu provider"
   priority: P2
   radac_baseline: "Sem SDK — apenas API REST"
   references: []
@@ -1499,8 +1499,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-100
   domain: ux
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Estender UI do DataHub"
   priority: P2
   radac_baseline: "Sem UI customizada — usa Superset (BI), DataHub (catálogo), Grafana (monitoring)"
   references: []
@@ -1530,8 +1530,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-101
   domain: ux
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Dashboard de governança completo"
   priority: P2
   radac_baseline: "Inexistente"
   references: []
@@ -1558,8 +1558,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-102
   domain: ux
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Portal self-service completo"
   priority: P2
   radac_baseline: "Meta da metodologia: reduzir 'time to pipeline' de 4 semanas para 2-5 dias"
   references: ["Data Mesh self-serve platform"]
@@ -1587,8 +1587,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-110
   domain: compliance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Todos — LGPD, GDPR, EU AI Act, NIST AI RMF, ISO 42001, SOX, DAMA-DMBOK"
   priority: P1
   radac_baseline: "Sem mapeamento explícito"
   references: ["EU AI Act", "NIST AI RMF 2.0", "LGPD", "GDPR", "ISO/IEC 42001"]
@@ -1621,8 +1621,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-111
   domain: compliance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Auto-classificação + controles por nível"
   priority: P1
   radac_baseline: "4 tipos de decisão: EMERGENCIAL, CRITICA, NORMAL, ESTRUTURAL"
   references: ["EU AI Act Art. 6-7 (risk classification)"]
@@ -1652,8 +1652,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-112
   domain: compliance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Kafka → PostgreSQL"
   priority: P1
   radac_baseline: "Hash chain SHA-256 in-memory (list[AuditEvent])"
   references: ["Append-only logs", "Kafka as audit log", "Blockchain/DLT"]
@@ -1683,8 +1683,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-113
   domain: compliance
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Todas as 11 knowledge areas DAMA"
   priority: P1
   radac_baseline: "Cobertura parcial implícita"
   references: ["DAMA-DMBOK 3.0 - 11 Knowledge Areas"]
@@ -1719,8 +1719,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-120
   domain: cost
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "OpenCost/Kubecost"
   priority: P2
   radac_baseline: "Estimativa de ~$9.000/mês para 10TB/dia (46% menos que managed services)"
   references: ["FinOps Foundation", "Kubecost", "OpenCost"]
@@ -1747,8 +1747,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-121
   domain: cost
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "4 perfis (dev/small/medium/large)"
   priority: P2
   radac_baseline: "Diagrama com 11 datastores; deploy real com 3"
   references: []
@@ -1776,8 +1776,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-122
   domain: cost
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Consulting/Support"
   priority: P2
   radac_baseline: "Projeto individual com AGPL-3.0"
   references: ["CNCF sustainability model", "Open Core"]
@@ -1808,8 +1808,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-130
   domain: community
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "BDFL"
   priority: P2
   radac_baseline: "Fork-and-PR simples"
   references: ["CNCF governance", "Apache Way", "BDFL"]
@@ -1836,8 +1836,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-131
   domain: community
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "6 pontos de extensão"
   priority: P2
   radac_baseline: "BaseExpert como ponto de extensão para AI experts"
   references: ["Plugin patterns", "SPI", "Micro-kernel architecture"]
@@ -1867,8 +1867,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-132
   domain: community
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Código EN, docs PT/EN/ZH"
   priority: P2
   radac_baseline: "READMEs em PT/EN/ZH; enums em português (POLITICA, ECONOMICA)"
   references: []
@@ -1901,8 +1901,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-140
   domain: roadmap
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "5 fases de rollout"
   priority: P2
   radac_baseline: "B-Swarm phases 1-6; Auditoria Q1-Q4"
   references: ["DCAM maturity levels"]
@@ -1931,8 +1931,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-141
   domain: roadmap
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "SemVer + API versioning"
   priority: P2
   radac_baseline: "Sem versionamento formal"
   references: ["Semantic Versioning 2.0", "API Versioning"]
@@ -1958,8 +1958,8 @@ ______________________________________________________________________
 <!-- metadata:
   id: ADR-142
   domain: roadmap
-  status: OPEN
-  decided_value: null
+  status: DECIDED
+  decided_value: "Security ASAP + quarterly features"
   priority: P2
   radac_baseline: "Sem cadência definida"
   references: []

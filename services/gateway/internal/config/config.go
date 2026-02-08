@@ -8,8 +8,9 @@ import (
 
 // Config holds the gateway configuration.
 type Config struct {
-	Port     int
-	Backends []string
+	Port         int
+	Backends     []string
+	OTelEndpoint string
 }
 
 // LoadFromEnv reads configuration from environment variables.
@@ -35,8 +36,14 @@ func LoadFromEnv() Config {
 		}
 	}
 
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if otelEndpoint == "" {
+		otelEndpoint = "localhost:4317"
+	}
+
 	return Config{
-		Port:     port,
-		Backends: backends,
+		Port:         port,
+		Backends:     backends,
+		OTelEndpoint: otelEndpoint,
 	}
 }

@@ -71,4 +71,5 @@ def test_audit_event_types() -> None:
 
 def test_expert_capabilities() -> None:
     assert ExpertCapability.SQL_GENERATION.value == "sql_generation"
-    assert len(ExpertCapability) == 4
+    assert ExpertCapability.METADATA_DISCOVERY.value == "metadata_discovery"
+    assert len(ExpertCapability) == 5

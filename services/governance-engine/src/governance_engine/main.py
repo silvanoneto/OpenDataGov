@@ -9,6 +9,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from odg_core.db.engine import create_async_engine_factory, get_async_session_factory
 from odg_core.settings import DatabaseSettings, NATSSettings
+from odg_core.telemetry import init_telemetry, shutdown_telemetry
+from odg_core.telemetry.db import instrument_db
+from odg_core.telemetry.middleware import instrument_fastapi
 
 from governance_engine.api.routes_audit import router as audit_router
 from governance_engine.api.routes_decisions import router as decisions_router
@@ -20,9 +23,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    """Manage application lifecycle: DB engine + NATS startup/shutdown."""
+    """Manage application lifecycle: OTel + DB engine + NATS startup/shutdown."""
+    init_telemetry("governance-engine")
+
     db_settings = DatabaseSettings()
     engine = create_async_engine_factory(db_settings)
+    instrument_db(engine)
     app.state.session_factory = get_async_session_factory(engine)
 
     nats_settings = NATSSettings()
@@ -34,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     await publisher.disconnect()
     await engine.dispose()
+    shutdown_telemetry()
 
 
 app = FastAPI(
@@ -41,6 +48,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+instrument_fastapi(app)
 
 app.include_router(decisions_router)
 app.include_router(audit_router)

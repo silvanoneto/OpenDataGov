@@ -103,7 +103,7 @@ services:
       nats:
         condition: service_started
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"]
+      test: ["CMD", "/usr/bin/python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -152,7 +152,7 @@ services:
       VLLM_BACKENDS: ""
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports:
-      - "8080:8080"
+      - "8082:8080"
 
 volumes:
   postgres_data:

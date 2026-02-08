@@ -49,3 +49,53 @@ class OTelSettings(BaseSettings):
 
     exporter_otlp_endpoint: str = "http://localhost:4317"
     service_name: str = "opendatagov"
+    enabled: bool = True
+
+
+class KafkaSettings(BaseSettings):
+    """Kafka connection settings."""
+
+    model_config = SettingsConfigDict(env_prefix="KAFKA_")
+
+    bootstrap_servers: str = "localhost:9092"
+    audit_topic: str = "odg.audit.events"
+    audit_retention_ms: int = 31_536_000_000  # 1 year
+
+
+class DataHubSettings(BaseSettings):
+    """DataHub catalog settings."""
+
+    model_config = SettingsConfigDict(env_prefix="DATAHUB_")
+
+    gms_url: str = "http://localhost:8080"
+    enabled: bool = False
+
+
+class KeycloakSettings(BaseSettings):
+    """Keycloak OIDC settings."""
+
+    model_config = SettingsConfigDict(env_prefix="KEYCLOAK_")
+
+    server_url: str = "http://localhost:8180"
+    realm: str = "opendatagov"
+    client_id: str = "odg-api"
+    enabled: bool = False
+
+
+class OPASettings(BaseSettings):
+    """OPA policy engine settings."""
+
+    model_config = SettingsConfigDict(env_prefix="OPA_")
+
+    url: str = "http://localhost:8181"
+    enabled: bool = False
+
+
+class VaultSettings(BaseSettings):
+    """HashiCorp Vault settings."""
+
+    model_config = SettingsConfigDict(env_prefix="VAULT_")
+
+    addr: str = "http://localhost:8200"
+    token: str = ""
+    enabled: bool = False

@@ -1,0 +1,21 @@
+# AWS EKS-specific overrides
+global:
+  storageClass: gp3
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+
+gateway:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+
+minio:
+  persistence:
+    storageClass: gp3
+    size: 50Gi
+
+postgres:
+  persistence:
+    storageClass: gp3
+    size: 20Gi

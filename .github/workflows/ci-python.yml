@@ -8,6 +8,7 @@ on:
       - "services/governance-engine/**"
       - "services/lakehouse-agent/**"
       - "services/data-expert/**"
+      - "services/quality-gate/**"
   pull_request:
     branches: [main]
     paths:
@@ -15,6 +16,7 @@ on:
       - "services/governance-engine/**"
       - "services/lakehouse-agent/**"
       - "services/data-expert/**"
+      - "services/quality-gate/**"
 
 jobs:
   lint:
@@ -26,6 +28,7 @@ jobs:
           - services/governance-engine
           - services/lakehouse-agent
           - services/data-expert
+          - services/quality-gate
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f # v4
@@ -81,6 +84,7 @@ jobs:
           services/governance-engine/tests/
           services/lakehouse-agent/tests/
           services/data-expert/tests/
+          services/quality-gate/tests/
           --import-mode=importlib
           --cov --cov-report=xml -q
       - name: Upload coverage
@@ -97,6 +101,7 @@ jobs:
           - services/governance-engine
           - services/lakehouse-agent
           - services/data-expert
+          - services/quality-gate
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build image
