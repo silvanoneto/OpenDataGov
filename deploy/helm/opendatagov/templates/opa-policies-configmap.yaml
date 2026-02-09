@@ -1,0 +1,12 @@
+{{- if .Values.opa.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-opa-policies
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opa-policies
+data:
+  authz.rego: |
+{{ .Files.Get "opa-policies/authz.rego" | indent 4 }}
+{{- end }}

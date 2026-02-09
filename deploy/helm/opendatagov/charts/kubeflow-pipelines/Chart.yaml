@@ -1,0 +1,20 @@
+apiVersion: v2
+name: kubeflow-pipelines
+version: 0.1.0
+appVersion: "2.0.5"
+description: Kubeflow Pipelines for ML workflow orchestration with B-Swarm governance
+keywords:
+  - kubeflow
+  - ml-pipelines
+  - mlops
+  - workflow-orchestration
+home: https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team
+
+dependencies:
+  # Argo Workflows is the execution engine for Kubeflow Pipelines
+  - name: argo-workflows
+    version: "0.41.x"
+    repository: https://argoproj.github.io/argo-helm
+    condition: argoWorkflows.enabled

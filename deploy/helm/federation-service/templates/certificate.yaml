@@ -1,0 +1,29 @@
+{{- if .Values.tls.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "federation-service.fullname" . }}-tls
+  labels:
+    {{- include "federation-service.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "federation-service.fullname" . }}-tls
+  duration: {{ .Values.tls.duration }}
+  renewBefore: {{ .Values.tls.renewBefore }}
+  subject:
+    organizations:
+      - {{ .Values.instance.organization }}
+  commonName: {{ include "federation-service.fullname" . }}
+  dnsNames:
+    - {{ include "federation-service.fullname" . }}
+    - {{ include "federation-service.fullname" . }}.{{ .Release.Namespace }}
+    - {{ include "federation-service.fullname" . }}.{{ .Release.Namespace }}.svc
+    - {{ include "federation-service.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    name: {{ .Values.tls.issuerRef.name }}
+    kind: {{ .Values.tls.issuerRef.kind }}
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+{{- end }}

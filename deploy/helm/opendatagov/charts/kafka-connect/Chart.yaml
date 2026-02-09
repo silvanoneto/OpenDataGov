@@ -1,0 +1,15 @@
+apiVersion: v2
+name: kafka-connect
+version: 0.1.0
+appVersion: "3.6.0"
+description: Kafka Connect with Debezium for CDC (Change Data Capture)
+keywords:
+  - kafka
+  - connect
+  - debezium
+  - cdc
+  - change-data-capture
+  - postgresql
+maintainers:
+  - name: OpenDataGov Team
+    email: governance@opendatagov.org

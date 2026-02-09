@@ -1,0 +1,144 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quality-gate.fullname" . }}
+  labels:
+    {{- include "quality-gate.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "quality-gate.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "quality-gate.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "quality-gate.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        - name: grpc
+          containerPort: {{ .Values.service.grpcTargetPort }}
+          protocol: TCP
+        env:
+        # Database
+        - name: POSTGRES_HOST
+          value: {{ include "quality-gate.postgresql.host" . | quote }}
+        - name: POSTGRES_PORT
+          value: {{ .Values.postgresql.port | quote }}
+        - name: POSTGRES_DB
+          value: {{ .Values.postgresql.database | quote }}
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "quality-gate.fullname" . }}
+              key: postgres-username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "quality-gate.fullname" . }}
+              key: postgres-password
+        # Redis
+        - name: REDIS_HOST
+          value: {{ include "quality-gate.redis.host" . | quote }}
+        - name: REDIS_PORT
+          value: {{ .Values.redis.port | quote }}
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "quality-gate.fullname" . }}
+              key: redis-password
+              optional: true
+        # Kafka
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: {{ include "quality-gate.kafka.bootstrapServers" . | quote }}
+        # MinIO
+        - name: MINIO_ENDPOINT
+          value: {{ include "quality-gate.minio.endpoint" . | quote }}
+        - name: MINIO_USE_SSL
+          value: {{ .Values.minio.useSsl | quote }}
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "quality-gate.fullname" . }}
+              key: minio-access-key
+              optional: true
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "quality-gate.fullname" . }}
+              key: minio-secret-key
+              optional: true
+        # Observability
+        {{- if .Values.observability.otelEndpoint }}
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ .Values.observability.otelEndpoint | quote }}
+        {{- end }}
+        {{- if .Values.observability.jaegerAgent }}
+        - name: JAEGER_AGENT_HOST
+          value: {{ .Values.observability.jaegerAgent | quote }}
+        {{- end }}
+        - name: METRICS_ENABLED
+          value: {{ .Values.observability.metricsEnabled | quote }}
+        - name: TRACING_ENABLED
+          value: {{ .Values.observability.tracingEnabled | quote }}
+        envFrom:
+        - configMapRef:
+            name: {{ include "quality-gate.fullname" . }}
+        {{- with .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        {{- with .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        {{- with .Values.volumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+      {{- with .Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

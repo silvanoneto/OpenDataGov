@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
-from odg_core.enums import DecisionStatus
+from fastapi import APIRouter, Depends, HTTPException
+from odg_core.auth.dependencies import get_current_user, require_role
+from odg_core.auth.models import UserContext
+from odg_core.enums import DecisionStatus, RACIRole
 
 from governance_engine.api.deps import ApprovalServiceDep, DecisionServiceDep, VetoServiceDep
 from governance_engine.api.schemas import (
@@ -26,6 +28,7 @@ router = APIRouter(prefix="/api/v1/decisions", tags=["decisions"])
 async def create_decision(
     body: CreateDecisionRequest,
     service: DecisionServiceDep,
+    user: UserContext = Depends(require_role(RACIRole.ACCOUNTABLE)),
 ) -> DecisionResponse:
     decision = await service.create_decision(
         decision_type=body.decision_type,
@@ -42,6 +45,7 @@ async def create_decision(
 @router.get("")
 async def list_decisions(
     service: DecisionServiceDep,
+    user: UserContext = Depends(get_current_user),
     domain_id: str | None = None,
     status: DecisionStatus | None = None,
     limit: int = 50,
@@ -52,7 +56,11 @@ async def list_decisions(
 
 
 @router.get("/{decision_id}", responses={404: {"description": "Decision not found"}})
-async def get_decision(decision_id: uuid.UUID, service: DecisionServiceDep) -> DecisionResponse:
+async def get_decision(
+    decision_id: uuid.UUID,
+    service: DecisionServiceDep,
+    user: UserContext = Depends(get_current_user),
+) -> DecisionResponse:
     decision = await service.get_decision(decision_id)
     if decision is None:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -64,6 +72,7 @@ async def submit_decision(
     decision_id: uuid.UUID,
     body: SubmitDecisionRequest,
     service: DecisionServiceDep,
+    user: UserContext = Depends(require_role(RACIRole.CONSULTED)),
 ) -> DecisionResponse:
     try:
         decision = await service.submit_for_approval(decision_id, body.actor_id)
@@ -77,6 +86,7 @@ async def approve_decision(
     decision_id: uuid.UUID,
     body: CastVoteRequest,
     service: ApprovalServiceDep,
+    user: UserContext = Depends(require_role(RACIRole.CONSULTED)),
 ) -> ApprovalResponse:
     try:
         record = await service.cast_vote(
@@ -94,6 +104,7 @@ async def approve_decision(
 async def list_approvals(
     decision_id: uuid.UUID,
     service: ApprovalServiceDep,
+    user: UserContext = Depends(get_current_user),
 ) -> list[ApprovalResponse]:
     records = await service.list_votes(decision_id)
     return [ApprovalResponse.model_validate(r, from_attributes=True) for r in records]
@@ -104,6 +115,7 @@ async def exercise_veto(
     decision_id: uuid.UUID,
     body: ExerciseVetoRequest,
     service: VetoServiceDep,
+    user: UserContext = Depends(require_role(RACIRole.ACCOUNTABLE)),
 ) -> VetoResponse:
     try:
         veto = await service.exercise_veto(
@@ -122,6 +134,7 @@ async def override_veto(
     veto_id: uuid.UUID,
     body: OverrideVetoRequest,
     service: VetoServiceDep,
+    user: UserContext = Depends(require_role(RACIRole.ACCOUNTABLE)),
 ) -> VetoResponse:
     try:
         veto = await service.override_veto(
@@ -137,6 +150,7 @@ async def override_veto(
 async def list_vetoes(
     decision_id: uuid.UUID,
     service: VetoServiceDep,
+    user: UserContext = Depends(get_current_user),
 ) -> list[VetoResponse]:
     vetoes = await service.list_vetoes(decision_id)
     return [VetoResponse.model_validate(v, from_attributes=True) for v in vetoes]

@@ -1,0 +1,138 @@
+# Example InferenceService for scikit-learn model with governance
+# This requires approval via B-Swarm before deployment
+
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: customer-churn
+  namespace: default
+  annotations:
+    # Governance annotations (required for production deployments)
+    odg.governance/requires-approval: "true"
+    odg.governance/decision-id: "dec-12345"  # From governance API
+
+    # Model metadata (EU AI Act compliance)
+    odg.model/risk-level: "LIMITED"  # HIGH, LIMITED, MINIMAL
+    odg.model/mlflow-uri: "models:/customer-churn/Production"
+    odg.model/version: "3"
+
+    # Deployment metadata
+    odg.deployment/deployed-by: "data-scientist-1"
+    odg.deployment/approved-by: "data-architect-1"
+
+  labels:
+    odg.model/name: "customer-churn"
+    odg.model/version: "3"
+    odg.model/framework: "sklearn"
+
+spec:
+  predictor:
+    # SKLearn predictor (uses kserve/sklearnserver)
+    sklearn:
+      # Storage URI (MinIO/S3)
+      storageUri: "s3://mlflow-artifacts/models/customer-churn/3"
+
+      # Runtime version
+      runtimeVersion: "1.3.0"
+
+      # Resources
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+
+      # Environment variables
+      env:
+        - name: AWS_ENDPOINT_URL
+          value: "http://minio:9000"
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: accessKeyId
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: secretAccessKey
+
+    # Autoscaling configuration
+    minReplicas: 1
+    maxReplicas: 3
+    scaleTarget: 70  # CPU target percentage
+    scaleMetric: cpu
+
+    # Traffic configuration
+    canaryTrafficPercent: 0  # 0 = no canary, 100 = full canary
+
+---
+# Example with custom predictor (ODGPredictor with observability)
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: fraud-detection
+  namespace: default
+  annotations:
+    odg.governance/requires-approval: "true"
+    odg.governance/decision-id: "dec-67890"
+    odg.model/risk-level: "HIGH"  # HIGH risk requires model card
+
+spec:
+  predictor:
+    # Custom predictor with observability
+    containers:
+      - name: kserve-container
+        image: odg/predictor:0.1.0  # Custom image with ODGPredictor
+        env:
+          - name: MODEL_NAME
+            value: "fraud-detection"
+          - name: MODEL_URI
+            value: "models:/fraud-detection/Production"
+          - name: MLFLOW_TRACKING_URI
+            value: "http://mlflow:5000"
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            value: "kafka:9092"
+          - name: KAFKA_TOPIC
+            value: "odg.predictions"
+          - name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "http://otel-collector:4317"
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+
+    minReplicas: 2  # HA for HIGH risk model
+    maxReplicas: 10
+
+---
+# Example with canary rollout (gradual deployment)
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: recommendation-engine
+  namespace: default
+  annotations:
+    odg.governance/requires-approval: "true"
+    odg.governance/decision-id: "dec-11111"
+    odg.model/risk-level: "LIMITED"
+
+spec:
+  predictor:
+    sklearn:
+      storageUri: "s3://mlflow-artifacts/models/recommendation-engine/5"
+      resources:
+        requests: {cpu: "1", memory: "2Gi"}
+
+    # Canary configuration (10% traffic to new version)
+    canaryTrafficPercent: 10
+
+  # Previous version (90% traffic)
+  # KServe automatically manages canary vs default traffic split

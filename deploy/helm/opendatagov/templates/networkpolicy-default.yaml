@@ -1,0 +1,109 @@
+{{- if .Values.networkPolicies.enabled }}
+---
+# Default Deny All Ingress and Egress (Zero-Trust)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-default-deny-all
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector: {}  # Applies to all pods in namespace
+  policyTypes:
+    - Ingress
+    - Egress
+  # Empty ingress/egress rules = deny all
+  {{- if not .Values.networkPolicies.enforceMode }}
+  # Advisory mode - allow all but log violations
+  ingress:
+    - {}
+  egress:
+    - {}
+  {{- end }}
+
+---
+# Allow DNS for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-allow-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Allow health checks from kubelet
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-allow-health-checks
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: opendatagov
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow kubelet health probes (from node network)
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080  # Health check port
+        - protocol: TCP
+          port: 8090  # Readiness check port
+
+---
+# Allow Prometheus metrics scraping
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-allow-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: opendatagov
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow Prometheus from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090  # Metrics port
+        - protocol: TCP
+          port: 9091  # Additional metrics port
+
+{{- end }}

@@ -1,0 +1,20 @@
+apiVersion: v2
+name: feast
+version: 0.1.0
+appVersion: "0.36.0"
+description: Feast feature store with OpenDataGov governance and quality gates
+keywords:
+  - feast
+  - feature-store
+  - mlops
+  - feature-engineering
+home: https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team
+
+dependencies:
+  # Redis for online store
+  - name: redis
+    version: "19.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

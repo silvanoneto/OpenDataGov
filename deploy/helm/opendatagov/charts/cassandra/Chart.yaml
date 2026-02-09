@@ -1,0 +1,20 @@
+apiVersion: v2
+name: cassandra
+description: Apache Cassandra - Distributed NoSQL database for JanusGraph backend
+type: application
+version: 1.0.0
+appVersion: "4.1.4"
+
+keywords:
+  - cassandra
+  - nosql
+  - distributed
+  - database
+
+home: https://cassandra.apache.org/
+sources:
+  - https://github.com/apache/cassandra
+
+maintainers:
+  - name: OpenDataGov Team
+    email: team@opendatagov.local

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: governance-engine
+description: OpenDataGov Governance Engine - Core governance and decision engine
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - governance
+  - data-governance
+  - decision-engine
+home: https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team

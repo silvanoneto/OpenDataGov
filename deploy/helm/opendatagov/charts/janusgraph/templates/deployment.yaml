@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "janusgraph.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "janusgraph.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "janusgraph.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "janusgraph.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "janusgraph.serviceAccountName" . }}
+      initContainers:
+        - name: wait-for-cassandra
+          image: cassandra:4.1.4
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Cassandra to be ready..."
+              until cqlsh {{ .Release.Name }}-cassandra 9042 -e "DESCRIBE KEYSPACES" > /dev/null 2>&1; do
+                echo "Cassandra not ready yet, waiting 5s..."
+                sleep 5
+              done
+              echo "Cassandra is ready!"
+      containers:
+        - name: janusgraph
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: gremlin
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: JANUS_PROPS_TEMPLATE
+              value: cql
+            - name: janusgraph.storage.backend
+              value: {{ .Values.properties.storage.backend }}
+            - name: janusgraph.storage.hostname
+              value: {{ .Release.Name }}-{{ .Values.properties.storage.hostname }}
+            - name: janusgraph.storage.port
+              value: {{ .Values.properties.storage.port | quote }}
+            - name: janusgraph.storage.cql.keyspace
+              value: {{ .Values.properties.storage.cql.keyspace }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            tcpSocket:
+              port: gremlin
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            tcpSocket:
+              port: gremlin
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/opt/janusgraph/janusgraph.properties
+              subPath: janusgraph.properties
+            {{- if .Values.persistence.enabled }}
+            - name: data
+              mountPath: /var/lib/janusgraph/index
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "janusgraph.fullname" . }}-config
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "janusgraph.fullname" . }}-data
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

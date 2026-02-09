@@ -1,8 +1,0 @@
-services:
-  argocd-server:
-    image: quay.io/argoproj/argocd:latest
-    command: argocd-server --insecure
-    ports:
-      - "8085:8080"
-    environment:
-      ARGOCD_SERVER_INSECURE: "true"

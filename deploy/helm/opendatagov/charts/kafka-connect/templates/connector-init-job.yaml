@@ -1,0 +1,74 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}-init-connectors
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "kafka-connect.selectorLabels" . | nindent 8 }}
+        job: connector-init
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-kafka-connect
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for Kafka Connect to be ready..."
+              until curl -f http://{{ include "kafka-connect.fullname" . }}:{{ .Values.service.port }}/connectors; do
+                echo "Kafka Connect not ready yet, waiting 5s..."
+                sleep 5
+              done
+              echo "Kafka Connect is ready!"
+      containers:
+        - name: init-connectors
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              CONNECT_URL="http://{{ include "kafka-connect.fullname" . }}:{{ .Values.service.port }}"
+
+              echo "Initializing Debezium connectors..."
+
+              {{- if .Values.connectors.postgresql.enabled }}
+              echo "Creating PostgreSQL CDC connector..."
+              curl -X POST \
+                -H "Content-Type: application/json" \
+                --data @/connectors/postgresql-cdc.json \
+                $CONNECT_URL/connectors || echo "PostgreSQL connector already exists or failed to create"
+              {{- end }}
+
+              {{- if .Values.connectors.timescaledb.enabled }}
+              echo "Creating TimescaleDB CDC connector..."
+              curl -X POST \
+                -H "Content-Type: application/json" \
+                --data @/connectors/timescaledb-cdc.json \
+                $CONNECT_URL/connectors || echo "TimescaleDB connector already exists or failed to create"
+              {{- end }}
+
+              echo "Listing all connectors:"
+              curl -s $CONNECT_URL/connectors | jq .
+
+              echo "Connector initialization complete!"
+          volumeMounts:
+            - name: connector-configs
+              mountPath: /connectors
+      volumes:
+        - name: connector-configs
+          configMap:
+            name: {{ include "kafka-connect.fullname" . }}-connectors

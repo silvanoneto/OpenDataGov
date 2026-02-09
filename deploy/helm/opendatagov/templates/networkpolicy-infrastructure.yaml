@@ -1,0 +1,392 @@
+{{- if .Values.networkPolicies.enabled }}
+---
+# PostgreSQL NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-postgresql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from application services
+    - from:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+        - podSelector:
+            matchLabels:
+              app: quality-gate
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow from Keycloak (uses PostgreSQL)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow from Airflow
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: airflow
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow from Superset
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: superset
+      ports:
+        - protocol: TCP
+          port: 5432
+
+  egress:
+    # Allow replication (if HA)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# Redis NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from application services
+    - from:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # Allow from Airflow
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: airflow
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # Allow from Superset
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: superset
+      ports:
+        - protocol: TCP
+          port: 6379
+
+  egress:
+    # Allow replication between master and replicas
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+
+---
+# Kafka NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-kafka
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kafka
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from application services (producers/consumers)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+        - podSelector:
+            matchLabels:
+              app: quality-gate
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+      ports:
+        - protocol: TCP
+          port: 9092  # Client port
+        - protocol: TCP
+          port: 9093  # TLS port
+
+  egress:
+    # Allow inter-broker communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9093
+
+    # Allow ZooKeeper (if using)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: zookeeper
+      ports:
+        - protocol: TCP
+          port: 2181
+
+---
+# MinIO NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-minio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from application services
+    - from:
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 9000  # API port
+
+    # Allow from Trino
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trino
+      ports:
+        - protocol: TCP
+          port: 9000
+
+    # Allow console access
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 9001  # Console port
+
+  egress:
+    # Allow inter-node communication (if distributed)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+
+---
+# Vault NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-vault
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from all application services (secret access)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: opendatagov
+      ports:
+        - protocol: TCP
+          port: 8200  # API port
+
+    # Allow from vault-init job
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: vault-init
+      ports:
+        - protocol: TCP
+          port: 8200
+
+  egress:
+    # Allow Raft communication (HA mode)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+      ports:
+        - protocol: TCP
+          port: 8201  # Cluster port
+
+    # Allow PostgreSQL (for dynamic credentials)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# Keycloak NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-keycloak
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from application services (JWT validation)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: opendatagov
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow from Gateway (user auth)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow from ingress (user login)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow from keycloak-init job
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: keycloak-init
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    # Allow PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow clustering (if HA)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 7600  # JGroups
+
+---
+# OPA NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-opa
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: opa
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: opa
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from application services (policy checks)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: opendatagov
+      ports:
+        - protocol: TCP
+          port: 8181  # API port
+
+{{- end }}

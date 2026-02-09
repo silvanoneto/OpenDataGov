@@ -1,0 +1,117 @@
+# Large Profile - AI Experts
+# High availability, multi-GPU, enterprise-grade resources
+
+ragExpert:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 4
+      memory: 8Gi
+    limits:
+      cpu: 8
+      memory: 16Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPU: 70
+
+codeExpert:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPU: 70
+
+visionExpert:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 4
+      memory: 8Gi
+    limits:
+      cpu: 8
+      memory: 16Gi
+  gpu:
+    enabled: true
+    count: 2  # Multi-GPU for high throughput
+  env:
+    - name: MODEL_NAME
+      value: openai/clip-vit-large-patch14  # Larger model for better accuracy
+    - name: DEVICE
+      value: cuda
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPU: 70
+
+nlpExpert:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  env:
+    - name: MODEL_NAME
+      value: bert-large-uncased  # Larger BERT for better accuracy
+    - name: DEVICE
+      value: cuda
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPU: 70
+
+qdrant:
+  enabled: true
+  replicaCount: 3  # HA mode
+  persistence:
+    enabled: true
+    size: 200Gi
+    storageClass: fast-ssd
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s  # More frequent scraping
+
+networkPolicy:
+  enabled: true
+
+# Anti-affinity for HA
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - ai-experts
+          topologyKey: kubernetes.io/hostname

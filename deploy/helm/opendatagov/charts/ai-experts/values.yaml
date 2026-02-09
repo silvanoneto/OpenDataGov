@@ -1,0 +1,189 @@
+# AI Experts Helm Chart Values
+# Supports 4 deployment profiles: dev, small, medium, large
+
+# Global settings
+global:
+  imageRegistry: ghcr.io/opendatagov
+  imagePullPolicy: IfNotPresent
+
+# RAG Expert (Qdrant + vLLM)
+ragExpert:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: rag-expert
+    tag: 0.1.0
+  service:
+    type: ClusterIP
+    port: 8002
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  qdrant:
+    url: http://qdrant:6333
+    collection: governance_docs
+  env:
+    - name: QDRANT_URL
+      value: http://qdrant:6333
+    - name: COLLECTION_NAME
+      value: governance_docs
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPU: 70
+
+# Code Expert (Starcoder)
+codeExpert:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: code-expert
+    tag: 0.1.0
+  service:
+    type: ClusterIP
+    port: 8004
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  env:
+    - name: MODEL_NAME
+      value: bigcode/starcoder
+    - name: MAX_LENGTH
+      value: "512"
+    - name: TEMPERATURE
+      value: "0.2"
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPU: 70
+
+# Vision Expert (CLIP)
+visionExpert:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: vision-expert
+    tag: 0.1.0
+  service:
+    type: ClusterIP
+    port: 8005
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  gpu:
+    enabled: false  # Enable for GPU acceleration
+    count: 1
+  env:
+    - name: MODEL_NAME
+      value: openai/clip-vit-base-patch32
+    - name: DEVICE
+      value: cpu  # Use 'cuda' for GPU
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPU: 70
+
+# NLP Expert (BERT)
+nlpExpert:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: nlp-expert
+    tag: 0.1.0
+  service:
+    type: ClusterIP
+    port: 8006
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  env:
+    - name: MODEL_NAME
+      value: bert-base-uncased
+    - name: DEVICE
+      value: cpu  # Use 'cuda' for GPU
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPU: 70
+
+# Qdrant (dependency for RAG Expert)
+qdrant:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: qdrant/qdrant
+    tag: v1.7.0
+  service:
+    type: ClusterIP
+    port: 6333
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# Shared configurations
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# Node selectors and tolerations
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Monitoring (Prometheus)
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress

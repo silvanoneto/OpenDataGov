@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "datahub.fullname" . }}-metadata-ingestion
+  labels:
+    {{- include "datahub.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metadata-ingestion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "datahub.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: metadata-ingestion
+  template:
+    metadata:
+      labels:
+        {{- include "datahub.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: metadata-ingestion
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: {{ include "datahub.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: metadata-ingestion
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.global.imageRegistry }}/metadata-ingestion:0.1.0"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: {{ include "datahub.kafka.bootstrap" . }}
+        - name: DATAHUB_GMS_URL
+          value: http://{{ include "datahub.fullname" . }}-gms:{{ .Values.gms.service.port }}
+        - name: CONSUMER_GROUP
+          value: metadata-ingestion
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

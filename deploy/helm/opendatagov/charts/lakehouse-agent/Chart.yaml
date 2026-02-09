@@ -1,0 +1,13 @@
+apiVersion: v2
+name: lakehouse-agent
+description: OpenDataGov Lakehouse Agent - Core lakehouse and iceberg catalog agent
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - lakehouse
+  - data-lakehouse
+  - decision-engine
+home: https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team

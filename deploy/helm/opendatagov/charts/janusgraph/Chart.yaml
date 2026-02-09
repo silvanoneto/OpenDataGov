@@ -1,0 +1,26 @@
+apiVersion: v2
+name: janusgraph
+description: JanusGraph - Distributed graph database for data lineage
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - janusgraph
+  - graph
+  - database
+  - lineage
+
+dependencies:
+  - name: cassandra
+    version: "1.0.0"
+    repository: "file://../cassandra"
+    condition: cassandra.enabled
+
+home: https://janusgraph.org/
+sources:
+  - https://github.com/JanusGraph/janusgraph
+
+maintainers:
+  - name: OpenDataGov Team
+    email: team@opendatagov.local

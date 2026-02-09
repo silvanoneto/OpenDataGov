@@ -1,0 +1,206 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-keycloak-init
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "opendatagov.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: keycloak-init
+        image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.keycloak.image.pullPolicy | default "IfNotPresent" }}
+        env:
+          - name: KEYCLOAK_ADMIN
+            value: {{ .Values.keycloak.auth.adminUser | default "admin" | quote }}
+          - name: KEYCLOAK_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "opendatagov.fullname" . }}-keycloak
+                key: admin-password
+          - name: KEYCLOAK_URL
+            value: "http://{{ include "opendatagov.fullname" . }}-keycloak:{{ .Values.keycloak.service.ports.http | default 80 }}"
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e
+            echo "=== Keycloak Initialization Job ==="
+
+            # Wait for Keycloak to be ready
+            echo "Waiting for Keycloak to be ready..."
+            until curl -sf ${KEYCLOAK_URL}/health/ready; do
+              echo "Keycloak not ready yet, waiting..."
+              sleep 5
+            done
+            echo "Keycloak is ready!"
+
+            # Configure kcadm credentials
+            echo "Configuring kcadm credentials..."
+            /opt/keycloak/bin/kcadm.sh config credentials \
+              --server ${KEYCLOAK_URL} \
+              --realm master \
+              --user ${KEYCLOAK_ADMIN} \
+              --password ${KEYCLOAK_ADMIN_PASSWORD}
+
+            # Create OpenDataGov realm if it doesn't exist
+            echo "Creating OpenDataGov realm..."
+            /opt/keycloak/bin/kcadm.sh create realms \
+              -s realm=opendatagov \
+              -s enabled=true \
+              -s displayName="OpenDataGov" \
+              -s loginTheme=keycloak \
+              -s accessTokenLifespan=3600 \
+              -s ssoSessionIdleTimeout=1800 \
+              -s ssoSessionMaxLifespan=36000 \
+              --skip-existing || echo "Realm already exists"
+
+            # Create RACI roles (ADR-013)
+            echo "Creating RACI roles..."
+            for role in data_owner data_steward data_consumer data_architect; do
+              echo "  - Creating role: ${role}"
+              /opt/keycloak/bin/kcadm.sh create roles \
+                -r opendatagov \
+                -s name=${role} \
+                -s description="RACI role: ${role}" \
+                --skip-existing || echo "    Role ${role} already exists"
+            done
+
+            # Create odg-api client
+            echo "Creating odg-api client..."
+            /opt/keycloak/bin/kcadm.sh create clients \
+              -r opendatagov \
+              -s clientId=odg-api \
+              -s enabled=true \
+              -s publicClient=false \
+              -s serviceAccountsEnabled=true \
+              -s directAccessGrantsEnabled=true \
+              -s standardFlowEnabled=true \
+              -s 'redirectUris=["*"]' \
+              -s 'webOrigins=["*"]' \
+              -s protocol=openid-connect \
+              --skip-existing || echo "Client already exists"
+
+            # Get client UUID
+            CLIENT_UUID=$(/opt/keycloak/bin/kcadm.sh get clients \
+              -r opendatagov \
+              -q clientId=odg-api \
+              --fields id \
+              --format csv \
+              --noquotes | tail -n1)
+
+            if [ -n "${CLIENT_UUID}" ]; then
+              echo "Configuring client ${CLIENT_UUID}..."
+
+              # Add RACI roles to client scope
+              for role in data_owner data_steward data_consumer data_architect; do
+                echo "  - Adding role ${role} to client scope"
+                /opt/keycloak/bin/kcadm.sh add-roles \
+                  -r opendatagov \
+                  --uusername service-account-odg-api \
+                  --rolename ${role} || echo "    Role ${role} already assigned"
+              done
+            fi
+
+            # Create test users if in dev mode
+            {{- if eq .Values.global.profile "dev" }}
+            echo "Creating test users for dev environment..."
+
+            # Test owner
+            /opt/keycloak/bin/kcadm.sh create users \
+              -r opendatagov \
+              -s username=test-owner \
+              -s enabled=true \
+              -s email=owner@opendatagov.local \
+              -s firstName=Test \
+              -s lastName=Owner \
+              --skip-existing || echo "User test-owner already exists"
+
+            /opt/keycloak/bin/kcadm.sh set-password \
+              -r opendatagov \
+              --username test-owner \
+              --new-password password || true
+
+            /opt/keycloak/bin/kcadm.sh add-roles \
+              -r opendatagov \
+              --uusername test-owner \
+              --rolename data_owner || true
+
+            # Test steward
+            /opt/keycloak/bin/kcadm.sh create users \
+              -r opendatagov \
+              -s username=test-steward \
+              -s enabled=true \
+              -s email=steward@opendatagov.local \
+              -s firstName=Test \
+              -s lastName=Steward \
+              --skip-existing || echo "User test-steward already exists"
+
+            /opt/keycloak/bin/kcadm.sh set-password \
+              -r opendatagov \
+              --username test-steward \
+              --new-password password || true
+
+            /opt/keycloak/bin/kcadm.sh add-roles \
+              -r opendatagov \
+              --uusername test-steward \
+              --rolename data_steward || true
+
+            # Test consumer
+            /opt/keycloak/bin/kcadm.sh create users \
+              -r opendatagov \
+              -s username=test-consumer \
+              -s enabled=true \
+              -s email=consumer@opendatagov.local \
+              -s firstName=Test \
+              -s lastName=Consumer \
+              --skip-existing || echo "User test-consumer already exists"
+
+            /opt/keycloak/bin/kcadm.sh set-password \
+              -r opendatagov \
+              --username test-consumer \
+              --new-password password || true
+
+            /opt/keycloak/bin/kcadm.sh add-roles \
+              -r opendatagov \
+              --uusername test-consumer \
+              --rolename data_consumer || true
+
+            # Test architect
+            /opt/keycloak/bin/kcadm.sh create users \
+              -r opendatagov \
+              -s username=test-architect \
+              -s enabled=true \
+              -s email=architect@opendatagov.local \
+              -s firstName=Test \
+              -s lastName=Architect \
+              --skip-existing || echo "User test-architect already exists"
+
+            /opt/keycloak/bin/kcadm.sh set-password \
+              -r opendatagov \
+              --username test-architect \
+              --new-password password || true
+
+            /opt/keycloak/bin/kcadm.sh add-roles \
+              -r opendatagov \
+              --uusername test-architect \
+              --rolename data_architect || true
+
+            echo "Test users created successfully!"
+            {{- end }}
+
+            echo "=== Keycloak initialization completed successfully ==="
+{{- end }}

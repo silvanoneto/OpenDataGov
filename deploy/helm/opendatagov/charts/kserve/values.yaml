@@ -1,0 +1,159 @@
+# Default values for kserve chart
+
+# Global settings
+global:
+  profile: dev
+  domain: "example.com"
+
+# KServe controller
+controller:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: kserve/kserve-controller
+    tag: "v0.12.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 443
+    targetPort: 9443
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+  # Webhook configuration
+  webhook:
+    enabled: true
+    port: 9443
+    certDir: /tmp/k8s-webhook-server/serving-certs
+
+# Governance webhook (OpenDataGov custom)
+governanceWebhook:
+  enabled: false  # Disabled in dev, enabled in medium/large
+  url: "http://governance-engine:8000/api/v1/webhooks/kserve/validate"
+  failurePolicy: Fail  # Block deployment if webhook fails
+  timeoutSeconds: 10
+
+# Inference service defaults
+inferenceService:
+  # Default predictor image for custom models
+  defaultPredictor:
+    image: kserve/sklearnserver
+    tag: "v0.12.0"
+
+  # Resource defaults
+  defaultResources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  # Autoscaling defaults
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetUtilizationPercentage: 70
+
+  # Canary rollout configuration
+  canary:
+    enabled: false
+    trafficPercent: 10
+
+# Storage configuration for model artifacts
+storage:
+  # S3/MinIO configuration
+  s3:
+    enabled: true
+    endpoint: ""  # Auto-configured to MinIO
+    bucket: mlflow-artifacts
+    region: us-east-1
+    useSSL: false
+    existingSecret: ""  # Secret with accessKeyID and secretAccessKey
+
+  # Persistent volume for model cache
+  modelCache:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+# Monitoring and observability
+monitoring:
+  enabled: true
+
+  # Prometheus metrics
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+
+  # OpenTelemetry tracing
+  openTelemetry:
+    enabled: true
+    collectorUrl: "http://otel-collector:4317"
+
+  # Kafka logging for predictions
+  kafka:
+    enabled: true
+    topic: odg.predictions
+    bootstrapServers: "kafka:9092"
+
+# Istio integration
+istio:
+  enabled: false  # Enabled in medium/large profiles
+  virtualService:
+    enabled: true
+    gateway: istio-system/gateway
+  destinationRule:
+    enabled: true
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+
+# Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Pod Security Context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# cert-manager configuration
+certManager:
+  enabled: false  # Will be enabled by parent if needed
+
+# Network policy
+networkPolicy:
+  enabled: false
+
+# Extra environment variables
+extraEnv: []

@@ -1,0 +1,57 @@
+{
+  "name": "odg-timescaledb-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "2",
+
+    "database.hostname": "timescaledb",
+    "database.port": "5432",
+    "database.user": "timescale",
+    "database.password": "timescale123",
+    "database.dbname": "timescale",
+    "database.server.name": "odg_timescale",
+
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_timescale",
+    "publication.name": "debezium_timescale_publication",
+
+    "table.include.list": "public.model_performance_ts,public.quality_metrics_ts,public.pipeline_metrics_ts",
+
+    "snapshot.mode": "never",
+
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "true",
+
+    "topic.prefix": "cdc.timescale",
+    "topic.creation.default.replication.factor": 1,
+    "topic.creation.default.partitions": 3,
+    "topic.creation.default.cleanup.policy": "delete",
+    "topic.creation.default.retention.ms": 259200000,
+
+    "transforms": "route,unwrap,addTimestamp",
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "([^.]+)\\.([^.]+)\\.([^.]+)",
+    "transforms.route.replacement": "$1.$2.$3",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.unwrap.add.fields": "table,lsn,source.ts_ms",
+    "transforms.addTimestamp.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
+    "transforms.addTimestamp.field": "time",
+    "transforms.addTimestamp.target.type": "Timestamp",
+
+    "heartbeat.interval.ms": "5000",
+    "heartbeat.topics.prefix": "__debezium-heartbeat-timescale",
+
+    "decimal.handling.mode": "double",
+    "time.precision.mode": "adaptive_time_microseconds",
+
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:9092",
+    "schema.history.internal.kafka.topic": "schema-changes.timescale",
+
+    "errors.tolerance": "all",
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true"
+  }
+}

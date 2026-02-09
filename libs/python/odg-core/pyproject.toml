@@ -25,6 +25,11 @@ dependencies = [
     "openlineage-python>=1.12,<2.0",
     "acryl-datahub>=0.12,<1.0",
     "opendp>=0.10,<1.0",
+    "strawberry-graphql[fastapi]>=0.200,<1.0",
+    "nats-py>=2.0,<3.0",
+    "grpcio>=1.60,<2.0",
+    "grpcio-tools>=1.60,<2.0",
+    "protobuf>=4.25,<6.0",
 ]
 
 [dependency-groups]
@@ -35,6 +40,13 @@ dev = [
     "ruff>=0.15",
     "mypy>=1.10",
     "types-PyYAML>=6.0",
+    "pyarrow-stubs",
+    "types-beautifulsoup4",
+    "duckdb",
+    "feast",
+    "kafka-python",
+    "couchdb",
+    "boto3-stubs",
 ]
 
 [build-system]
@@ -51,6 +63,12 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "A", "SIM", "TCH", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/graphql/**/*.py" = ["TCH"]      # Strawberry evaluates annotations at runtime
+"**/graphql/schema.py" = ["A002", "TCH"]  # GraphQL resolvers use `id` parameter; strawberry runtime annotations
+"**/api/*.py" = ["TCH", "B008"]    # FastAPI evaluates annotations at runtime
+"**/grpc/*.py" = ["N802"]          # gRPC methods follow PascalCase convention
 
 [tool.mypy]
 python_version = "3.13"
@@ -94,6 +112,96 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["scipy", "scipy.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["strawberry", "strawberry.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["nats", "nats.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["grpc", "grpc.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["google", "google.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["kafka", "kafka.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["couchdb", "couchdb.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["gremlin_python", "gremlin_python.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["bs4", "bs4.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["minio", "minio.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyiceberg", "pyiceberg.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["requests", "requests.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["httpx", "httpx.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["feast", "feast.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyspark", "pyspark.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["odg_core.proto_gen.*"]
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["airflow", "airflow.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["polars", "polars.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["duckdb", "duckdb.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["boto3", "boto3.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+warn_return_any = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

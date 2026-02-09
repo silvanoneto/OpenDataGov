@@ -1,0 +1,158 @@
+# Model Card: Code Expert
+# EU AI Act Compliance Document
+# Risk Level: LIMITED (Article 52 - Transparency obligations)
+
+model_details:
+  name: code-expert
+  version: 0.1.0
+  model_type: Code Generation and Analysis
+  model_backend:
+    - Code Generation: bigcode/starcoder (7B parameters)
+    - Syntax Validation: Python AST + TreeSitter
+    - Security Scanning: Pattern-based (Semgrep in production)
+  deployment_date: "2026-02-08"
+  developer: OpenDataGov Team
+  contact: governance@opendatagov.org
+
+intended_use:
+  primary_use_cases:
+    - Generate code from natural language descriptions
+    - Review code for security and quality issues
+    - Suggest code refactoring improvements
+    - Identify potential bugs in code
+  target_users:
+    - Data Scientists
+    - Data Engineers
+    - Software Developers
+  out_of_scope:
+    - Production code deployment without review
+    - Security-critical code without thorough testing
+    - Code with known vulnerabilities
+
+capabilities:
+  - name: code_generation
+    description: Generate code from natural language
+    requires_approval: true
+  - name: code_review
+    description: Review code for security and quality
+    requires_approval: false  # Read-only analysis
+  - name: refactoring
+    description: Suggest refactoring improvements
+    requires_approval: false  # Suggestions only
+  - name: bug_fix
+    description: Suggest fixes for bugs
+    requires_approval: true  # Code changes
+
+training_data:
+  dataset: The Stack (BigCode project)
+  size: 6.4 TB of permissive code (GitHub)
+  languages:
+    - Python
+    - JavaScript
+    - Java
+    - Go
+    - And 80+ other languages
+  license: BigCode OpenRAIL-M
+  ethical_review: Opt-out mechanism for code authors
+
+performance_metrics:
+  code_generation:
+    pass@1: "33.6% (HumanEval benchmark)"
+    pass@10: "65.8% (HumanEval benchmark)"
+  syntax_validation:
+    accuracy: "99%+ (AST parsing)"
+  security_scanning:
+    precision: "70-80% (pattern-based, false positives expected)"
+    recall: "60-70% (basic patterns only)"
+
+limitations:
+  - May generate syntactically correct but semantically wrong code
+  - Security scanning is basic (upgrade to Semgrep for production)
+  - Does not understand business logic or domain constraints
+  - May suggest insecure code patterns if not caught by scanner
+  - Biased toward code patterns in training data (GitHub)
+  - Cannot test generated code for correctness
+
+ethical_considerations:
+  bias:
+    - Training data from GitHub may reflect demographic biases
+    - Code style biased toward popular languages (Python, JavaScript)
+  copyright:
+    - Model trained on permissive licenses only
+    - May generate code similar to training data
+    - Users responsible for license compliance
+  security:
+    - Generated code must be reviewed for vulnerabilities
+    - Pattern-based scanner has limited coverage
+    - Manual security review required for production
+  transparency:
+    - Always disclose AI-generated code
+    - Include validation results in output
+    - Tag generated code in version control
+
+risk_assessment:
+  eu_ai_act:
+    risk_level: LIMITED
+    article: Article 52 (Transparency obligations)
+    justification: >
+      AI system that generates code for human review.
+      Not used for automated deployment without oversight.
+
+  security_risks:
+    - Code injection: Generated code may contain vulnerabilities
+    - Supply chain: Generated code must be vetted like external code
+    - Intellectual property: Similarity to training data
+
+  mitigation_measures:
+    - Mandatory code review: All generated code requires approval
+    - Syntax validation: AST parsing before return
+    - Security scanning: Pattern-based vulnerability detection
+    - Audit trail: All generated code logged
+    - Human oversight: Data Scientist reviews before use
+    - Testing requirement: Generated code must pass tests
+
+governance:
+  raci:
+    responsible: Data Scientist (code generation requests)
+    accountable: Data Architect (deployment approval)
+    consulted: Security Team (vulnerability review)
+    informed: Data Steward (monitoring)
+
+  approval_workflow:
+    registration: Requires Data Architect approval
+    code_generation: "Requires requester review (requires_approval: true)"
+    code_deployment: Requires security review + testing
+
+  monitoring:
+    - OpenTelemetry traces for all requests
+    - Prometheus metrics (latency, generation success rate)
+    - Grafana dashboards for usage patterns
+    - Kafka audit logs for generated code
+
+human_oversight:
+  mechanism: "AI generates, human reviews and deploys"
+  implementation:
+    - All code_generation marked requires_approval: true
+    - Syntax validation results shown to user
+    - Security scan results highlighted
+    - Manual testing required before deployment
+  escalation:
+    - Critical vulnerabilities: Block deployment
+    - Syntax errors: Return to user with error
+    - Low confidence: Flag for expert review
+
+compliance:
+  regulations:
+    - EU AI Act: LIMITED risk (Article 52)
+    - Cyber Resilience Act: Code quality requirements
+    - NIS2 Directive: Security requirements for critical infrastructure
+
+  security_features:
+    - Syntax validation (AST/TreeSitter)
+    - Security scanning (pattern-based)
+    - Human-in-the-loop approval
+    - Audit logging
+
+  model_card_version: 1.0
+  last_updated: "2026-02-08"
+  next_review: "2026-08-08"  # 6 months

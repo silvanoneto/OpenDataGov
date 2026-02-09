@@ -1,0 +1,134 @@
+## Apache Cassandra Configuration for JanusGraph Backend
+
+## Cluster configuration
+clusterSize: 3
+clusterName: "odg-cassandra"
+datacenter: "dc1"
+rack: "rack1"
+
+## Image configuration
+image:
+  repository: cassandra
+  tag: "4.1.4"
+  pullPolicy: IfNotPresent
+
+## Resource limits
+resources:
+  requests:
+    cpu: "1"
+    memory: 4Gi
+  limits:
+    cpu: "2"
+    memory: 8Gi
+
+## JVM Heap size (50% of memory)
+heap:
+  maxHeapSize: 4G
+  newHeapSize: 800M
+
+## Cassandra configuration
+cassandraConfig:
+  # Cluster settings
+  clusterName: "odg-cassandra"
+  numTokens: 256
+
+  # Network settings
+  listenAddress: ""  # Auto-detected
+  rpcAddress: "0.0.0.0"
+  broadcastRpcAddress: ""  # Auto-detected
+
+  # Data settings
+  commitlogSync: "periodic"
+  commitlogSyncPeriodInMs: 10000
+
+  # Performance
+  concurrentReads: 32
+  concurrentWrites: 32
+  concurrentCounterWrites: 32
+
+  # Storage
+  diskOptimizationStrategy: "ssd"
+
+  # Compaction
+  compactionThroughputMbPerSec: 64
+
+## Service configuration
+service:
+  type: ClusterIP
+  ports:
+    cql: 9042
+    thrift: 9160
+    jmx: 7199
+    agent: 7000
+    intranode: 7001
+
+## Persistence
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 50Gi
+  accessMode: ReadWriteOnce
+
+## Readiness probe
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+## Liveness probe
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 90
+  periodSeconds: 30
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+## Pod Security Context
+podSecurityContext:
+  fsGroup: 999
+  runAsUser: 999
+  runAsNonRoot: true
+
+## Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 999
+
+## Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+## Node selector
+nodeSelector: {}
+
+## Tolerations
+tolerations: []
+
+## Affinity - spread pods across nodes
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app
+              operator: In
+              values:
+                - cassandra
+        topologyKey: kubernetes.io/hostname
+
+## Initialize keyspace for JanusGraph
+initKeyspace:
+  enabled: true
+  replicationFactor: 3
+  keyspaceName: janusgraph

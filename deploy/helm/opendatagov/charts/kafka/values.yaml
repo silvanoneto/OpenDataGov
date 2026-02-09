@@ -1,0 +1,81 @@
+## Apache Kafka Configuration (KRaft mode - no Zookeeper)
+
+## Cluster configuration
+replicaCount: 1
+
+## Image configuration (official Apache Kafka image)
+image:
+  repository: apache/kafka
+  tag: "3.9.0"
+  pullPolicy: IfNotPresent
+
+## KRaft (Kafka Raft) configuration
+kraft:
+  processRoles: "broker,controller"
+  clusterId: "MkU3OEVBNTcwNTJENDM2Qk"
+
+## Kafka broker configuration
+config:
+  offsetsTopicReplicationFactor: 1
+  transactionStateLogReplicationFactor: 1
+  transactionStateLogMinIsr: 1
+  logRetentionHours: 168
+  logSegmentBytes: 1073741824
+
+## Service configuration
+service:
+  type: ClusterIP
+  ports:
+    client: 9092
+    external: 9094
+    controller: 9093
+
+## Persistence
+persistence:
+  enabled: false
+  storageClass: ""
+  size: 10Gi
+  accessMode: ReadWriteOnce
+
+## Resource limits
+resources:
+  requests:
+    cpu: "100m"
+    memory: 256Mi
+  limits:
+    cpu: "500m"
+    memory: 512Mi
+
+## Readiness probe
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+
+## Liveness probe
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+## Pod Security Context
+podSecurityContext: {}
+
+## Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+## Node selector
+nodeSelector: {}
+
+## Tolerations
+tolerations: []
+
+## Affinity
+affinity: {}

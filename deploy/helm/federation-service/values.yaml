@@ -1,0 +1,201 @@
+# COSMOS Federation Service Helm Values
+
+replicaCount: 2
+
+image:
+  repository: odg/federation-service
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 50060
+  targetPort: grpc
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2"
+    memory: "2Gi"
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 75
+
+# mTLS Configuration
+tls:
+  enabled: true
+  # Certificate issuer (cert-manager)
+  issuerRef:
+    name: federation-ca-issuer
+    kind: ClusterIssuer
+  # Automatically rotate certificates
+  autoRotate: true
+  # Certificate duration
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # 15 days
+
+# Instance Configuration
+instance:
+  id: "opendatagov-local"
+  name: "OpenDataGov Local"
+  region: "local"
+  organization: "Default Organization"
+  sharedNamespaces:
+    - gold
+    - platinum
+
+# Database Configuration
+database:
+  host: "postgresql"
+  port: 5432
+  database: "odg"
+  username: "odg"
+  # Password from secret
+  passwordSecret:
+    name: "postgresql-credentials"
+    key: "password"
+
+# Federation Configuration
+federation:
+  # Endpoints exposed by this instance
+  graphqlEndpoint: "http://gateway:8080/graphql"
+  grpcEndpoint: "federation-service:50060"
+
+  # Auto-register on startup
+  autoRegister: true
+
+  # Health check interval
+  healthCheckInterval: 30s
+
+  # Discovery cache TTL
+  discoveryCacheTTL: 5m
+
+# Security
+security:
+  # OPA authorization endpoint
+  opaEndpoint: "http://opa:8181/v1/data/cosmos/federation/allow"
+
+  # IP allowlist for federation endpoints
+  ipAllowlist: []
+
+  # Rate limiting
+  rateLimit:
+    enabled: true
+    requestsPerSecond: 100
+    burst: 200
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  metrics:
+    port: 9090
+    path: /metrics
+
+# Logging
+logging:
+  level: "info"
+  format: "json"
+
+# Probes
+livenessProbe:
+  grpc:
+    port: grpc
+    service: liveness
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  grpc:
+    port: grpc
+    service: readiness
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Pod Security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+      ports:
+        - protocol: TCP
+          port: 50060
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "federation-service"
+
+# Pod Annotations
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"
+
+# Node Selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - federation-service
+          topologyKey: kubernetes.io/hostname

@@ -115,6 +115,132 @@ curl -X POST http://localhost:8003/api/v1/validate \
   }'
 ```
 
+## API Protocols (Phase 3)
+
+OpenDataGov supports multiple API protocols for different use cases:
+
+### GraphQL API
+
+Query metadata with precise field selection:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/graphql \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "query { decision(id: \"<decision-id>\") { id title status approvers { userId vote } } }"
+  }'
+```
+
+**Interactive Playground**: Open `http://localhost:8000/api/v1/graphql` in your browser
+
+**Use cases**: Complex queries, lineage traversal, reducing overfetching
+
+📖 See [GraphQL API Guide](docs/API_GRAPHQL.md) for full reference
+
+### gRPC API
+
+High-performance inter-service communication:
+
+```bash
+# Install grpcurl
+brew install grpcurl
+
+# List available services
+grpcurl -plaintext localhost:50051 list
+
+# Call GovernanceService
+grpcurl -plaintext \
+  -d '{
+    "decision_type": "data_promotion",
+    "title": "Test Decision",
+    "domain_id": "test",
+    "created_by": "user-1"
+  }' \
+  localhost:50051 governance.GovernanceService/CreateDecision
+```
+
+**Available Services**:
+
+- GovernanceService (`:50051`)
+- CatalogService (`:50052`)
+- QualityService (`:50053`)
+
+📖 See [gRPC API Guide](docs/API_GRPC.md) for full reference
+
+### Event Streaming (Kafka)
+
+Subscribe to real-time events:
+
+```python
+from odg_core.events.kafka_consumer import KafkaConsumer
+
+consumer = KafkaConsumer(bootstrap_servers="localhost:9092")
+await consumer.subscribe(["odg.audit.events", "odg.governance.decisions"])
+
+async for event in consumer.consume():
+    print(f"Event: {event.type} - {event.data}")
+```
+
+**Available Topics**:
+
+- `odg.audit.events` — Audit trail events
+- `odg.governance.decisions` — Decision state changes
+- `odg.quality.reports` — Quality validation results
+- `odg.lineage.updates` — Lineage graph updates
+
+## Plugin Architecture
+
+Extend OpenDataGov without modifying core code:
+
+```python
+from odg_core.quality.base_check import BaseCheck, CheckResult
+from odg_core.plugins.registry import PluginRegistry
+
+# Create custom quality check
+class CustomCheck(BaseCheck):
+    async def validate(self, data):
+        # Your validation logic
+        return CheckResult(passed=True, score=0.95)
+
+# Register plugin
+PluginRegistry.register_check("custom", CustomCheck)
+```
+
+**Available Extension Points**:
+
+- **Quality Checks** (`BaseCheck`) — Data quality validators
+- **Governance Rules** (`BaseRule`) — Policy enforcement
+- **Catalog Connectors** (`BaseConnector`) — Metadata extraction
+- **Privacy Mechanisms** (`BasePrivacy`) — Data protection
+- **Storage Backends** (`BaseStorage`) — Storage adapters
+- **AI Experts** (`BaseExpert`) — AI recommendations
+
+📖 See [Plugin Development Guide](docs/PLUGINS.md) for examples
+
+## Deployment Profiles
+
+Choose the right deployment size:
+
+| Profile    | Resources                    | Use Case               | Monthly Cost |
+| ---------- | ---------------------------- | ---------------------- | ------------ |
+| **dev**    | 4 vCPU, 16GB RAM             | Local development      | ~$50         |
+| **small**  | 16 vCPU, 64GB RAM            | Small teams, \<1TB/day | ~$400        |
+| **medium** | 64 vCPU, 256GB RAM, 1 GPU    | Enterprise, 1-10TB/day | ~$2,500      |
+| **large**  | 256+ vCPU, 1TB+ RAM, 2+ GPUs | Large-scale, >10TB/day | ~$15,000+    |
+
+```bash
+# Deploy small profile
+helm install odg opendatagov/opendatagov -f values-small.yaml
+
+# Deploy medium profile with GPU
+helm install odg opendatagov/opendatagov -f values-medium.yaml
+
+# Deploy large profile (multi-AZ HA)
+helm install odg opendatagov/opendatagov -f values-large.yaml
+```
+
+📖 See [Deployment Profiles](docs/DEPLOYMENT_PROFILES.md) for sizing guide
+
 ## Optional Components
 
 Enable additional features with separate compose files:

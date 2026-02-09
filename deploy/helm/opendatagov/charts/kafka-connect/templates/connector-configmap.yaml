@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}-connectors
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+data:
+  postgresql-cdc.json: |
+    {{- .Files.Get "connectors/postgresql-cdc.json" | nindent 4 }}
+
+  timescaledb-cdc.json: |
+    {{- .Files.Get "connectors/timescaledb-cdc.json" | nindent 4 }}

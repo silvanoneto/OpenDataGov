@@ -1,0 +1,150 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finops-dashboard
+  namespace: odg-platform
+  labels:
+    app: finops-dashboard
+    component: finops
+    tier: backend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: finops-dashboard
+  template:
+    metadata:
+      labels:
+        app: finops-dashboard
+        component: finops
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: finops-dashboard
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: finops-dashboard
+          image: odg/finops-dashboard:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: finops-dashboard-secrets
+                  key: database-url
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: secret-access-key
+                  optional: true
+            - name: GCP_PROJECT_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: finops-dashboard-config
+                  key: gcp-project-id
+                  optional: true
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /secrets/gcp/credentials.json
+            - name: LOG_LEVEL
+              value: "INFO"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          volumeMounts:
+            - name: gcp-credentials
+              mountPath: /secrets/gcp
+              readOnly: true
+      volumes:
+        - name: gcp-credentials
+          secret:
+            secretName: gcp-service-account
+            optional: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finops-dashboard
+  namespace: odg-platform
+  labels:
+    app: finops-dashboard
+    component: finops
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: finops-dashboard
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: finops-dashboard
+  namespace: odg-platform
+  labels:
+    app: finops-dashboard
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finops-dashboard-config
+  namespace: odg-platform
+data:
+  gcp-project-id: "your-gcp-project"
+  cost-collection-schedule: "0 */6 * * *"  # Every 6 hours
+  budget-check-schedule: "0 * * * *"  # Every hour
+  anomaly-detection-schedule: "0 2 * * *"  # Daily at 2am
+  recommendation-schedule: "0 3 * * 0"  # Weekly on Sunday at 3am
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: finops-dashboard-secrets
+  namespace: odg-platform
+type: Opaque
+stringData:
+  database-url: "postgresql+asyncpg://odg:odg@postgres:5432/finops"

@@ -1,248 +1,248 @@
+# ===== OpenDataGov - Embedded Profile (Default) =====
+# Resources: 1-2 vCPU, 2-4GB RAM
+# Target: Edge computing, IoT gateways, development laptops
+# Note: Minimal services for resource-constrained environments
+
+# ─── Global Settings ─────────────────────────────────────
 global:
+  profile: embedded
+  domain: opendatagov.local
+  storageClass: standard
+
+  # Image settings
   imageRegistry: ""
   imagePullSecrets: []
 
-# ─── Infrastructure ─────────────────────────────────────
+  # Security
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
 
-postgres:
-  image:
-    repository: postgres
-    tag: "16-alpine"
-    pullPolicy: IfNotPresent
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # GPU support (used in medium/large profiles)
+  gpu:
+    enabled: false
+    count: 0
+
+# ─── Infrastructure (Minimal) ────────────────────────────
+postgresql:
+  enabled: true
+  encryption:
+    enabled: false
   auth:
     username: odg
-    password: odg
+    password: dev_password_change_me
     database: odg
-  persistence:
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  primary:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    persistence:
+      enabled: true
+      size: 8Gi
 
 redis:
-  image:
-    repository: redis
-    tag: "7-alpine"
-    pullPolicy: IfNotPresent
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
+  enabled: true
+  auth:
+    enabled: true
+    password: dev_redis_password
+  master:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    persistence:
+      enabled: false
 
 minio:
-  image:
-    repository: minio/minio
-    tag: "latest"
-    pullPolicy: IfNotPresent
+  enabled: true
   auth:
-    rootUser: minioadmin
-    rootPassword: minioadmin
+    rootUser: admin
+    rootPassword: dev_minio_password
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   persistence:
-    size: 5Gi
+    enabled: true
+    size: 10Gi
+
+# ─── Messaging (NATS only for embedded) ─────────────────
+nats:
+  enabled: true
   resources:
     requests:
       cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-nats:
-  image:
-    repository: nats
-    tag: "2-alpine"
-    pullPolicy: IfNotPresent
-  persistence:
-    size: 1Gi
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
       memory: 128Mi
-
-# ─── Observability ──────────────────────────────────────
-
-otelCollector:
-  image:
-    repository: otel/opentelemetry-collector-contrib
-    tag: "latest"
-    pullPolicy: IfNotPresent
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
     limits:
       cpu: 200m
       memory: 256Mi
 
-jaeger:
-  image:
-    repository: jaegertracing/all-in-one
-    tag: "latest"
-    pullPolicy: IfNotPresent
+kafka:
+  enabled: false  # Too heavy for embedded
+
+# ─── Layer 5: Analytics & Query (Disabled) ──────────────
+trino:
+  enabled: false
+
+airflow:
+  enabled: false
+
+superset:
+  enabled: false
+
+timescaledb:
+  enabled: false
+
+# ─── AI Components (Disabled) ───────────────────────────
+qdrant:
+  enabled: false
+
+kubeflow:
+  enabled: false
+
+# ─── Data Catalog (Disabled) ────────────────────────────
+datahub:
+  enabled: false
+
+# ─── Observability (Minimal - Jaeger only) ──────────────
+grafana:
+  enabled: false
+
+loki:
+  enabled: false
+
+tempo:
+  enabled: true
   resources:
     requests:
-      cpu: 50m
+      cpu: 100m
       memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 200m
+      memory: 256Mi
 
-# ─── Application Services ───────────────────────────────
+# ─── Auth & Security (Disabled) ─────────────────────────
+certManager:
+  enabled: false
 
-governanceEngine:
+keycloak:
+  enabled: false
+
+opa:
+  enabled: false
+
+vault:
+  enabled: false
+
+istio:
+  enabled: false
+
+networkPolicies:
+  enabled: false
+
+# ─── Custom Services (OpenDataGov Core) ─────────────────
+governance-engine:
+  enabled: true
   replicaCount: 1
   image:
     repository: opendatagov/governance-engine
     tag: "0.1.0"
     pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
   service:
     type: ClusterIP
     port: 8000
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-      ephemeral-storage: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-      ephemeral-storage: 256Mi
-  env:
-    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
-    REDIS_URL: "redis://{{ .Release.Name }}-redis:6379/0"
-    NATS_URL: "nats://{{ .Release.Name }}-nats:4222"
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
-    OTEL_SERVICE_NAME: governance-engine
+    grpcPort: 50051
 
-lakehouseAgent:
+  env:
+    ENVIRONMENT: embedded
+    LOG_LEVEL: INFO
+    ENABLE_GRPC: "true"
+    ENABLE_GRAPHQL: "true"
+
+  autoscaling:
+    enabled: false
+
+lakehouse-agent:
+  enabled: true
   replicaCount: 1
   image:
     repository: opendatagov/lakehouse-agent
     tag: "0.1.0"
     pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
   service:
     type: ClusterIP
     port: 8001
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-      ephemeral-storage: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-      ephemeral-storage: 256Mi
+
   env:
-    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
-    MINIO_ENDPOINT: "{{ .Release.Name }}-minio:9000"
-    MINIO_ACCESS_KEY: minioadmin
-    MINIO_SECRET_KEY: minioadmin
-    MINIO_SECURE: "false"
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
-    OTEL_SERVICE_NAME: lakehouse-agent
+    ENVIRONMENT: embedded
+    LOG_LEVEL: INFO
+
+  autoscaling:
+    enabled: false
+
+data-expert:
+  enabled: false  # Disabled in embedded
 
 dataExpert:
-  replicaCount: 1
-  image:
-    repository: opendatagov/data-expert
-    tag: "0.1.0"
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 8002
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-      ephemeral-storage: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-      ephemeral-storage: 256Mi
-  env:
-    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
-    OTEL_SERVICE_NAME: data-expert
+  allowExternalAI: false
+
+quality-gate:
+  enabled: false  # Disabled in embedded
 
 gateway:
-  replicaCount: 1
-  image:
-    repository: opendatagov/gateway
-    tag: "0.1.0"
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 8080
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-      ephemeral-storage: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
-      ephemeral-storage: 128Mi
-  env:
-    GATEWAY_PORT: "8080"
-    VLLM_BACKENDS: ""
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
+  enabled: false  # Disabled in embedded
 
-qualityGate:
-  replicaCount: 1
-  image:
-    repository: opendatagov/quality-gate
-    tag: "0.1.0"
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 8003
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-      ephemeral-storage: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-      ephemeral-storage: 256Mi
-  env:
-    DATABASE_URL: "postgresql+asyncpg://odg:odg@{{ .Release.Name }}-postgres:5432/odg"
-    OTEL_EXPORTER_OTLP_ENDPOINT: "http://{{ .Release.Name }}-otel-collector:4317"
-    OTEL_SERVICE_NAME: quality-gate
-
-# ─── Feature Flags (Fase 2) ──────────────────────────────
-
-features:
-  datahub: false
-  keycloak: false
-  opa: false
-  vault: false
-  loki: true
-  kafkaUi: true
-
-# ─── Autoscaling ──────────────────────────────────────────
-
-autoscaling:
+# ─── Spark (Disabled) ───────────────────────────────────
+spark:
   enabled: false
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
 
-# ─── KEDA Event-driven Scaling (ADR-083) ──────────────────
-
-keda:
+# ─── Ingress ────────────────────────────────────────────
+ingress:
   enabled: false
-  pollingInterval: 30
-  cooldownPeriod: 300
-  minReplicas: 1
-  maxReplicas: 10
+  className: nginx
+  annotations: {}
+  tls: []
+
+# ─── Service Monitor (Prometheus) ───────────────────────
+serviceMonitor:
+  enabled: false
+
+# ─── Pod Security Standards ────────────────────────────
+podSecurity:
+  enabled: false  # Disabled for embedded
+  enforce: privileged

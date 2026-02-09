@@ -15,6 +15,14 @@ dev = [
     "pytest>=9.0",
     "pytest-asyncio>=1.0",
     "pytest-cov>=7.0",
+
+    # Type stubs to reduce mypy missing-imports errors during CI and local dev
+    "types-requests",
+    "types-grpcio",
+    "types-protobuf",
+    "pandas-stubs",
+    "scipy-stubs",
+    "types-hvac",
 ]
 
 [tool.uv.sources]
@@ -53,9 +61,14 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/api/*.py" = ["TCH"]      # FastAPI evaluates annotations at runtime
-"**/main.py" = ["TCH"]       # lifespan/app startup needs runtime imports
-"**/tests/*.py" = ["TCH"]    # pytest fixtures resolve types at runtime
+"**/api/*.py" = ["TCH", "B008"]      # FastAPI evaluates annotations at runtime; Depends/Query in defaults
+"**/main.py" = ["TCH", "B008"]       # lifespan/app startup needs runtime imports; Depends/Query in defaults
+"**/tests/*.py" = ["TCH"]            # pytest fixtures resolve types at runtime
+"**/auth.py" = ["B008"]              # FastAPI Depends/Security in defaults
+"examples/*.py" = ["E402"]           # examples use inline imports for readability
+"**/grpc/*.py" = ["N802"]            # gRPC methods follow PascalCase convention
+"**/components/*.py" = ["N806"]      # sklearn uses uppercase X convention
+"**/graphql/schema.py" = ["A002"]    # GraphQL resolvers use `id` parameter
 
 [tool.mypy]
 python_version = "3.13"
@@ -88,10 +101,28 @@ module = [
 ]
 disallow_untyped_decorators = false
 
+[[tool.mypy.overrides]]
+module = [
+    "odg_core.proto_gen.*",
+    "odg_core.proto_gen",
+]
+# Generated protobuf/grpc code is not typed by us; relax untyped-def checks for these files
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+testpaths = [
+    "libs/python/odg-core/tests",
+    "services/governance-engine/tests",
+    "services/lakehouse-agent/tests",
+    "services/data-expert/tests",
+    "services/quality-gate/tests",
+]
+addopts = "-ra --strict-markers --import-mode=importlib"
+markers = [
+    "kafka: requires running Kafka cluster (port-forward to Kind)",
+]
 
 [tool.coverage.run]
 source = [
@@ -103,18 +134,18 @@ source = [
 ]
 omit = [
     "*/migrations/*",
-    "*/db/engine.py",
-    "*/db/redis.py",
-    "*/db/tables.py",
-    "*/db/__init__.py",
-    "*/repository/postgres.py",
-    "*/repository/protocols.py",
-    "*/api/deps.py",
-    "*/api/routes*.py",
-    "*/api/schemas.py",
-    "*/events/publisher.py",
-    "*/main.py",
-    "*/minio_client.py",
+    "*/proto_gen/*",
+    "services/governance-engine/src/governance_engine/repository/postgres.py",
+    "services/governance-engine/src/governance_engine/grpc/*",
+    "services/governance-engine/src/governance_engine/events/kafka_*",
+    "services/governance-engine/src/governance_engine/run_servers.py",
+    "services/governance-engine/src/governance_engine/webhooks/*",
+    "services/lakehouse-agent/src/lakehouse_agent/api/*",
+    "services/lakehouse-agent/src/lakehouse_agent/main.py",
+    "services/lakehouse-agent/src/lakehouse_agent/minio_client.py",
+    "services/quality-gate/src/quality_gate/api/*",
+    "services/quality-gate/src/quality_gate/main.py",
+    "services/governance-engine/src/governance_engine/api/deps.py",
 ]
 
 [tool.coverage.report]

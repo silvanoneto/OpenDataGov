@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "cassandra.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cassandra.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "cassandra.fullname" . }}
+  replicas: {{ .Values.clusterSize }}
+  selector:
+    matchLabels:
+      {{- include "cassandra.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cassandra.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "cassandra.serviceAccountName" . }}
+      containers:
+        - name: cassandra
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: cql
+              containerPort: {{ .Values.service.ports.cql }}
+              protocol: TCP
+            - name: thrift
+              containerPort: {{ .Values.service.ports.thrift }}
+              protocol: TCP
+            - name: jmx
+              containerPort: {{ .Values.service.ports.jmx }}
+              protocol: TCP
+            - name: agent
+              containerPort: {{ .Values.service.ports.agent }}
+              protocol: TCP
+            - name: intranode
+              containerPort: {{ .Values.service.ports.intranode }}
+              protocol: TCP
+          env:
+            - name: CASSANDRA_SEEDS
+              value: {{ include "cassandra.fullname" . }}-0.{{ include "cassandra.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+            - name: CASSANDRA_CLUSTER_NAME
+              value: {{ .Values.cassandraConfig.clusterName | quote }}
+            - name: CASSANDRA_DC
+              value: {{ .Values.datacenter | quote }}
+            - name: CASSANDRA_RACK
+              value: {{ .Values.rack | quote }}
+            - name: CASSANDRA_ENDPOINT_SNITCH
+              value: "GossipingPropertyFileSnitch"
+            - name: MAX_HEAP_SIZE
+              value: {{ .Values.heap.maxHeapSize | quote }}
+            - name: HEAP_NEWSIZE
+              value: {{ .Values.heap.newHeapSize | quote }}
+            - name: CASSANDRA_NUM_TOKENS
+              value: {{ .Values.cassandraConfig.numTokens | quote }}
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - nodetool status | grep -E "^UN\s+${POD_IP}"
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - nodetool status | grep -E "^UN\s+${POD_IP}"
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/cassandra
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

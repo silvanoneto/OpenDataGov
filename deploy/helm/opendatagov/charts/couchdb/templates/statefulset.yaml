@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "couchdb.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "couchdb.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "couchdb.fullname" . }}
+  replicas: {{ .Values.clusterSize }}
+  selector:
+    matchLabels:
+      {{- include "couchdb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "couchdb.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "couchdb.serviceAccountName" . }}
+      initContainers:
+        - name: init-config
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command:
+            - sh
+            - -c
+            - |
+              if [ ! -f /opt/couchdb/data/couchdb.uri ]; then
+                echo "Initializing CouchDB data directory..."
+                mkdir -p /opt/couchdb/data
+                chown -R couchdb:couchdb /opt/couchdb/data
+              fi
+          volumeMounts:
+            - name: data
+              mountPath: /opt/couchdb/data
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      containers:
+        - name: couchdb
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 5984
+              protocol: TCP
+            - name: epmd
+              containerPort: 4369
+              protocol: TCP
+            - name: erlang
+              containerPort: 9100
+              protocol: TCP
+          env:
+            - name: COUCHDB_USER
+              value: {{ .Values.adminUsername | quote }}
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "couchdb.fullname" . }}-credentials
+                  key: adminPassword
+            - name: COUCHDB_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "couchdb.fullname" . }}-credentials
+                  key: cookieAuthSecret
+            - name: ERL_FLAGS
+              value: "-name couchdb@$(POD_NAME).{{ include "couchdb.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local -setcookie {{ .Values.erlangCookie | default (randAlphaNum 32) }}"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+              httpHeaders:
+                - name: Authorization
+                  value: Basic {{ printf "%s:%s" .Values.adminUsername .Values.adminPassword | b64enc }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: /_up
+              port: 5984
+              httpHeaders:
+                - name: Authorization
+                  value: Basic {{ printf "%s:%s" .Values.adminUsername .Values.adminPassword | b64enc }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /opt/couchdb/data
+            - name: config
+              mountPath: /opt/couchdb/etc/local.d/custom.ini
+              subPath: custom.ini
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "couchdb.fullname" . }}-config
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistentVolume.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistentVolume.accessModes | nindent 10 }}
+        {{- if .Values.persistentVolume.storageClass }}
+        storageClassName: {{ .Values.persistentVolume.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistentVolume.size }}
+  {{- else }}
+    - name: data
+      emptyDir: {}
+  {{- end }}

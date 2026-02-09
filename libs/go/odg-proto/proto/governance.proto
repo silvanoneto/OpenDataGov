@@ -95,3 +95,86 @@ message VetoRecord {
   string overridden_by = 9;
   google.protobuf.Timestamp overridden_at = 10;
 }
+
+// Request to create a new governance decision.
+message CreateDecisionRequest {
+  DecisionType decision_type = 1;
+  string title = 2;
+  string description = 3;
+  string domain_id = 4;
+  string created_by = 5;
+  map<string, string> metadata = 6;
+  string source_layer = 7;
+  string target_layer = 8;
+  string data_classification = 9;
+}
+
+// Request to get a decision by ID.
+message GetDecisionRequest {
+  string id = 1;
+}
+
+// Request to list decisions with filters.
+message ListDecisionsRequest {
+  string domain_id = 1;
+  DecisionStatus status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+// Response containing list of decisions.
+message ListDecisionsResponse {
+  repeated GovernanceDecision decisions = 1;
+  int32 total_count = 2;
+}
+
+// Request to approve/reject a decision.
+message CastVoteRequest {
+  string decision_id = 1;
+  string voter_id = 2;
+  VoteValue vote = 3;
+  string comment = 4;
+}
+
+// Request to exercise a veto.
+message ExerciseVetoRequest {
+  string decision_id = 1;
+  string vetoed_by = 2;
+  RACIRole vetoed_by_role = 3;
+  string reason = 4;
+}
+
+// Request to submit a decision for approval workflow.
+message SubmitDecisionRequest {
+  string decision_id = 1;
+}
+
+// Request to stream decisions (server streaming).
+message StreamDecisionsRequest {
+  string domain_id = 1;
+  DecisionStatus status = 2;
+}
+
+// GovernanceService provides gRPC endpoints for governance decisions.
+service GovernanceService {
+  // Create a new governance decision.
+  rpc CreateDecision(CreateDecisionRequest) returns (GovernanceDecision);
+
+  // Get a decision by ID.
+  rpc GetDecision(GetDecisionRequest) returns (GovernanceDecision);
+
+  // List decisions with optional filters.
+  rpc ListDecisions(ListDecisionsRequest) returns (ListDecisionsResponse);
+
+  // Cast a vote (approve/reject) on a decision.
+  rpc CastVote(CastVoteRequest) returns (ApprovalRecord);
+
+  // Exercise a veto against a decision.
+  rpc ExerciseVeto(ExerciseVetoRequest) returns (VetoRecord);
+
+  // Submit a decision for approval workflow.
+  rpc SubmitDecision(SubmitDecisionRequest) returns (GovernanceDecision);
+
+  // Stream decisions (server streaming for real-time updates).
+  rpc StreamDecisions(StreamDecisionsRequest) returns (stream GovernanceDecision);
+}

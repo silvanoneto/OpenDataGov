@@ -1,0 +1,232 @@
+# GPU Manager Service - Helm Chart Values
+
+replicaCount: 2
+
+image:
+  repository: odg/gpu-manager
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: gpu-manager.opendatagov.io
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: gpu-manager-tls
+      hosts:
+        - gpu-manager.opendatagov.io
+
+database:
+  host: postgresql
+  port: 5432
+  database: gpu_manager
+  username: postgres
+  passwordSecret: postgresql-secret
+  passwordKey: password
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+# NVIDIA GPU Operator
+nvidia-gpu-operator:
+  enabled: true
+  operator:
+    defaultRuntime: containerd
+  driver:
+    enabled: true
+    version: "535.129.03"  # Latest NVIDIA driver
+  toolkit:
+    enabled: true
+  devicePlugin:
+    enabled: true
+    version: v0.14.3
+  dcgmExporter:
+    enabled: true
+    version: 3.3.0-3.2.0
+    serviceMonitor:
+      enabled: true
+  gfd:
+    enabled: true  # GPU Feature Discovery
+  migManager:
+    enabled: true  # Multi-Instance GPU support
+
+# Karpenter (Auto-scaler)
+karpenter:
+  enabled: true
+  replicas: 2
+  controller:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+
+  # Default Provisioner for GPU nodes
+  provisioners:
+    - name: gpu-training
+      enabled: true
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values:
+            - p4d.24xlarge   # 8x A100 80GB
+            - p5.48xlarge    # 8x H100 80GB
+            - g6.48xlarge    # 8x L40S 48GB
+            - g5.xlarge      # 1x A10G 24GB
+            - g4dn.xlarge    # 1x T4 16GB
+      limits:
+        resources:
+          nvidia.com/gpu: 64  # Max 64 GPUs in cluster
+      ttlSecondsAfterEmpty: 600  # Scale down after 10min idle
+      ttlSecondsUntilExpired: 604800  # Max node age: 7 days
+      labels:
+        workload-type: gpu-training
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+
+# Prometheus for GPU metrics
+prometheus:
+  enabled: true
+  scrapeInterval: 30s
+  retention: 15d
+
+  # ServiceMonitor for DCGM Exporter
+  serviceMonitors:
+    - name: dcgm-exporter
+      selector:
+        app: nvidia-dcgm-exporter
+      endpoints:
+        - port: metrics
+          interval: 30s
+
+# Grafana Dashboards
+grafana:
+  enabled: true
+  dashboards:
+    gpu-cluster:
+      file: dashboards/gpu-cluster.json
+    gpu-jobs:
+      file: dashboards/gpu-jobs.json
+    gpu-cost:
+      file: dashboards/gpu-cost.json
+
+# Priority Classes for GPU jobs
+priorityClasses:
+  - name: gpu-workload-critical
+    value: 1000000
+    description: "Critical GPU workloads (production inference)"
+  - name: gpu-workload-high
+    value: 10000
+    description: "High priority GPU workloads"
+  - name: gpu-workload-medium
+    value: 1000
+    description: "Medium priority GPU workloads (default)"
+  - name: gpu-workload-low
+    value: 100
+    description: "Low priority GPU workloads (can be preempted)"
+
+# Resource Quotas per namespace
+resourceQuotas:
+  ml-research:
+    requests.nvidia.com/gpu: "16"
+    limits.nvidia.com/gpu: "16"
+    requests.cpu: "64"
+    requests.memory: 512Gi
+
+  ml-production:
+    requests.nvidia.com/gpu: "32"
+    limits.nvidia.com/gpu: "32"
+    requests.cpu: "128"
+    requests.memory: 1024Gi
+
+# Cost tracking
+costTracking:
+  enabled: true
+  budgetAlerts:
+    - project: ml-research
+      monthlyBudgetUsd: 10000
+      alertThresholds: [50, 80, 100]  # %
+      slackWebhook: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX
+
+    - project: ml-production
+      monthlyBudgetUsd: 50000
+      alertThresholds: [80, 100]
+      slackWebhook: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX
+
+# Spot instance config
+spotInstances:
+  enabled: true
+  targetPercentage: 70  # 70% of nodes should be spot
+  interruptionHandling:
+    checkpointIntervalMinutes: 15
+    maxRetries: 3
+
+# Job scheduler worker (processes queue)
+scheduler:
+  enabled: true
+  replicas: 1
+  pollingIntervalSeconds: 10
+  maxConcurrentJobs: 100
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# Monitoring & Alerting
+monitoring:
+  enabled: true
+  alerts:
+    - name: GPUNodeNotReady
+      condition: kube_node_status_condition{condition="Ready",status="false",label_gpu_type!=""} == 1
+      for: 5m
+      severity: critical
+      message: "GPU node {{ $labels.node }} is not ready"
+
+    - name: GPUUtilizationLow
+      condition: avg(DCGM_FI_DEV_GPU_UTIL) < 20
+      for: 30m
+      severity: warning
+      message: "GPU utilization is low ({{ $value }}%), consider scaling down"
+
+    - name: GPUJobStuckInQueue
+      condition: count(gpu_jobs{status="queued"}) > 10
+      for: 15m
+      severity: warning
+      message: "{{ $value }} jobs stuck in queue, may need to scale up"
+
+    - name: BudgetExceeded
+      condition: sum(gpu_job_cost_usd) by (project_id) > project_budget_usd
+      for: 1m
+      severity: critical
+      message: "Project {{ $labels.project_id }} exceeded budget"

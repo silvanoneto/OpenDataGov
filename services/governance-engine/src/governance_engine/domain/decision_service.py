@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from odg_core.enums import AuditEventType, DecisionStatus, DecisionType
 from odg_core.models import GovernanceDecision, PromotionMetadata
@@ -29,11 +29,11 @@ class DecisionService:
         *,
         decision_type: DecisionType,
         title: str,
-        description: str,
+        description: str = "",
         domain_id: str,
         created_by: str,
         promotion: PromotionMetadata | None = None,
-        metadata: dict[str, str | int | float | bool | None] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> GovernanceDecision:
         """Create a new governance decision in PENDING status."""
         decision = GovernanceDecision(

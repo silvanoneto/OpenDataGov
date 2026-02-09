@@ -1,0 +1,242 @@
+# DataHub Helm Chart Values
+# Metadata platform for data catalog, lineage, and discovery
+
+global:
+  imageRegistry: docker.io
+  imagePullPolicy: IfNotPresent
+
+# DataHub GMS (General Metadata Service)
+gms:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: acryldata/datahub-gms
+    tag: v0.12.0
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  env:
+    - name: DATAHUB_ANALYTICS_ENABLED
+      value: "true"
+    - name: DATAHUB_SERVER_TYPE
+      value: prod
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPU: 70
+
+# DataHub Frontend
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: acryldata/datahub-frontend-react
+    tag: v0.12.0
+  service:
+    type: ClusterIP
+    port: 9002
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPU: 70
+
+# DataHub MAE Consumer (Metadata Audit Event)
+maeConsumer:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: acryldata/datahub-mae-consumer
+    tag: v0.12.0
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# DataHub MCE Consumer (Metadata Change Event)
+mceConsumer:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: acryldata/datahub-mce-consumer
+    tag: v0.12.0
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# PostgreSQL (metadata storage)
+postgresql:
+  enabled: true
+  auth:
+    username: datahub
+    password: datahub
+    database: datahub
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+# Elasticsearch (search index)
+elasticsearch:
+  enabled: true
+  replicas: 1
+  minimumMasterNodes: 1
+  volumeClaimTemplate:
+    resources:
+      requests:
+        storage: 30Gi
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# Kafka (event streaming)
+kafka:
+  enabled: true
+  replicaCount: 1
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+  zookeeper:
+    enabled: true
+    replicaCount: 1
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# DataHub Ingestion (metadata extraction)
+ingestion:
+  enabled: true
+  # Ingestion sources configuration
+  sources:
+    # PostgreSQL sources (Lakehouse metadata)
+    postgresql:
+      enabled: true
+      connection:
+        host: postgresql
+        port: 5432
+        database: lakehouse
+        username: lakehouse_user
+    # S3/MinIO (Lakehouse storage)
+    s3:
+      enabled: true
+      endpoint: http://minio:9000
+      bucket_patterns:
+        - odg-bronze/*
+        - odg-silver/*
+        - odg-gold/*
+        - odg-platinum/*
+    # MLflow (model registry)
+    mlflow:
+      enabled: true
+      tracking_uri: http://mlflow:5000
+    # Feast (feature store)
+    feast:
+      enabled: true
+      feature_store_url: http://feast:6566
+
+# Lineage tracking
+lineage:
+  enabled: true
+  # Track lineage for:
+  sources:
+    - type: lakehouse
+      description: Bronze → Silver → Gold → Platinum
+    - type: ml_pipeline
+      description: Kubeflow Pipelines
+    - type: feature_engineering
+      description: Feast feature transformations
+    - type: model_training
+      description: MLflow experiments
+
+# Governance integration
+governance:
+  enabled: true
+  # B-Swarm governance tags
+  tags:
+    - name: pii
+      description: Contains Personally Identifiable Information
+      color: "#FF0000"
+    - name: gdpr
+      description: GDPR regulated data
+      color: "#FFA500"
+    - name: gold_layer
+      description: High quality (DQ score >= 0.95)
+      color: "#FFD700"
+    - name: production
+      description: Production-ready dataset
+      color: "#00FF00"
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+# Network Policy
+networkPolicy:
+  enabled: true
+
+# Security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false  # DataHub needs write access
+
+# Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Node selectors and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}

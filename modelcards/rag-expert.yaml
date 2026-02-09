@@ -1,0 +1,139 @@
+# Model Card: RAG Expert
+# EU AI Act Compliance Document
+# Risk Level: LIMITED (Article 52 - Transparency obligations)
+
+model_details:
+  name: rag-expert
+  version: 0.1.0
+  model_type: Retrieval-Augmented Generation (RAG)
+  model_backend:
+    - SentenceTransformer: all-mpnet-base-v2
+    - LLM: Mistral-7B-Instruct-v0.2 (vLLM)
+    - Vector Store: Qdrant
+  deployment_date: "2026-02-08"
+  developer: OpenDataGov Team
+  contact: governance@opendatagov.org
+
+intended_use:
+  primary_use_cases:
+    - Semantic search over governance documents
+    - Question answering with retrieved context
+    - Policy and regulation summarization
+    - Compliance checking against regulations
+  target_users:
+    - Data Stewards
+    - Data Architects
+    - Compliance Officers
+    - Data Scientists
+  out_of_scope:
+    - Legal advice (requires human lawyer review)
+    - Automated decision-making without human oversight
+    - Production deployment without approval
+
+capabilities:
+  - name: document_search
+    description: Semantic search over governance documents
+    requires_approval: false
+  - name: qa_generation
+    description: Answer questions using retrieved context
+    requires_approval: true
+  - name: summarization
+    description: Summarize governance policies
+    requires_approval: true
+  - name: compliance_check
+    description: Check compliance against regulations
+    requires_approval: true
+
+training_data:
+  embedding_model:
+    dataset: MS MARCO passage ranking dataset
+    size: ~8.8M passages
+    language: English
+  llm_model:
+    dataset: Mistral-7B trained on diverse web data
+    size: Unknown (proprietary)
+    license: Apache 2.0
+
+performance_metrics:
+  embedding_quality:
+    ndcg@10: 0.347  # MSMARCO benchmark
+    mrr@10: 0.328
+  retrieval_accuracy:
+    top_5_recall: "85-90% (internal evaluation)"
+  generation_quality:
+    human_rating: "7.5/10 (requires production evaluation)"
+
+limitations:
+  - Answers limited to information in vector store
+  - May hallucinate when insufficient context
+  - English-only (multilingual support pending)
+  - Requires periodic reindexing for new documents
+  - Cannot provide legal advice
+  - Confidence scores are estimates, not guarantees
+
+ethical_considerations:
+  bias:
+    - Training data may contain societal biases
+    - Responses should be reviewed for bias in governance context
+  fairness:
+    - Equal access to all users with proper authentication
+    - No discriminatory filtering of documents
+  transparency:
+    - Always provides source documents for verification
+    - Confidence scores displayed to users
+  privacy:
+    - No PII in governance documents (enforced at ingestion)
+    - Query logs retained for audit (GDPR-compliant)
+
+risk_assessment:
+  eu_ai_act:
+    risk_level: LIMITED
+    article: Article 52 (Transparency obligations)
+    justification: >
+      AI system that interacts with humans to provide recommendations.
+      Not used for decision-making without human oversight.
+
+  mitigation_measures:
+    - "Human-in-the-loop: All QA answers require approval (requires_approval: true)"
+    - Audit trail: All queries logged to Kafka for governance
+    - Source transparency: Documents cited for every answer
+    - Confidence scoring: Low-confidence answers flagged for review
+    - Regular evaluation: Monthly quality checks on answer accuracy
+
+governance:
+  raci:
+    responsible: Data Scientist (model training, updates)
+    accountable: Data Architect (deployment approval)
+    consulted: Data Owner (domain expertise)
+    informed: Data Steward (monitoring)
+
+  approval_workflow:
+    registration: Requires Data Architect approval
+    deployment: Requires governance decision (ADR-011)
+    updates: Requires reapproval for major version changes
+
+  monitoring:
+    - OpenTelemetry traces for all requests
+    - Prometheus metrics (latency, throughput, errors)
+    - Grafana dashboards for performance
+    - Kafka audit logs for governance
+
+human_oversight:
+  mechanism: "AI recommends, human decides"
+  implementation:
+    - All answers marked with requires_approval: true
+    - Data Architect reviews before production use
+    - Source documents provided for verification
+  escalation:
+    - Low confidence (<0.5): Automatic escalation
+    - Compliance queries: Always require legal review
+
+compliance:
+  regulations:
+    - EU AI Act: LIMITED risk (Article 52)
+    - GDPR: Article 22 (automated decision-making safeguards)
+    - LGPD: Similar to GDPR Article 22
+
+  model_card_version: 1.0
+  last_updated: "2026-02-08"
+  next_review: "2026-08-08"  # 6 months

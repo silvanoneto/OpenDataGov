@@ -1,0 +1,172 @@
+# Model Card: Vision Expert
+# EU AI Act Compliance Document
+# Risk Level: LIMITED (Article 52 - Transparency obligations)
+
+model_details:
+  name: vision-expert
+  version: 0.1.0
+  model_type: Vision Understanding and Classification
+  model_backend:
+    - Vision Model: OpenAI CLIP (ViT-B/32)
+    - Embedding Dimension: 512
+    - Architecture: Vision Transformer
+  deployment_date: "2026-02-08"
+  developer: OpenDataGov Team
+  contact: governance@opendatagov.org
+
+intended_use:
+  primary_use_cases:
+    - Classify images into predefined categories
+    - Match images to text descriptions
+    - Answer questions about image content
+    - Detect objects in images (with additional models)
+  target_users:
+    - Data Stewards (visual data quality checks)
+    - Data Scientists (image dataset labeling)
+    - Compliance Officers (visual content verification)
+  out_of_scope:
+    - Biometric identification (UNACCEPTABLE under EU AI Act)
+    - Emotion recognition (HIGH risk, requires special approval)
+    - Real-time surveillance (UNACCEPTABLE)
+    - Medical diagnosis (HIGH risk, out of scope)
+
+capabilities:
+  - name: image_classification
+    description: Classify images into categories
+    requires_approval: true  # If confidence < 0.8
+  - name: image_text_similarity
+    description: Match images to text descriptions
+    requires_approval: false  # Search operation
+  - name: visual_qa
+    description: Answer questions about images
+    requires_approval: true  # Human verification needed
+  - name: object_detection
+    description: Detect and locate objects
+    requires_approval: true  # Verification needed
+
+training_data:
+  dataset: CLIP trained on 400M image-text pairs
+  sources: Internet (public images with alt-text)
+  size: 400 million image-text pairs
+  languages: English (primary), some multilingual
+  collection_period: Data collected before 2021
+  license: OpenAI license (research and non-commercial use)
+
+performance_metrics:
+  zero_shot_classification:
+    imagenet_top1: "63.2%"
+    imagenet_top5: "86.8%"
+  image_text_retrieval:
+    flickr30k_r@1: "88.0%"
+    flickr30k_r@5: "98.7%"
+  robustness:
+    imagenet_c_top1: "52.3% (corrupted images)"
+
+limitations:
+  - Performance degrades on out-of-distribution images
+  - Biased toward Western visual concepts (training data)
+  - May misclassify images from underrepresented groups
+  - Low accuracy on fine-grained categories (breeds, species)
+  - Cannot explain visual reasoning (black box)
+  - May be fooled by adversarial examples
+  - Limited to 224x224 input resolution
+
+ethical_considerations:
+  bias:
+    - Training data from internet reflects societal biases
+    - Lower accuracy on non-Western images
+    - Gender and racial stereotypes may be present
+    - Age bias in facial recognition scenarios
+  fairness:
+    - Equal error rates not guaranteed across demographics
+    - Must not be used for discriminatory purposes
+  privacy:
+    - No biometric identification capabilities
+    - No face recognition for authentication
+    - Image data must be anonymized if contains people
+  transparency:
+    - Confidence scores provided for all predictions
+    - Top-k predictions shown for context
+    - Human review required for low-confidence results
+
+risk_assessment:
+  eu_ai_act:
+    risk_level: LIMITED
+    article: Article 52 (Transparency obligations)
+    justification: >
+      AI system for image analysis and classification.
+      Not used for prohibited purposes (biometrics, emotion recognition).
+      Requires human oversight for decisions.
+
+  prohibited_uses:
+    - Biometric identification (Article 5.1.d - UNACCEPTABLE)
+    - Emotion recognition in workplace/education (Article 5.1.f)
+    - Social scoring (Article 5.1.c)
+    - Real-time surveillance (Article 5.1.d)
+
+  mitigation_measures:
+    - Confidence thresholds: Low confidence triggers approval
+    - Human review: Visual QA always requires verification
+    - Bias monitoring: Track accuracy across demographics
+    - Privacy protection: No biometric capabilities
+    - Audit trail: All classifications logged
+
+governance:
+  raci:
+    responsible: Data Scientist (model deployment, monitoring)
+    accountable: Data Architect (deployment approval)
+    consulted: Ethics Committee (bias review)
+    informed: Data Steward (usage monitoring)
+
+  approval_workflow:
+    registration: Requires Data Architect approval
+    deployment: Requires governance decision (ADR-011)
+    use_cases: Each new use case requires ethical review
+
+  monitoring:
+    - OpenTelemetry traces for all requests
+    - Prometheus metrics (latency, classification accuracy)
+    - Grafana dashboards for usage patterns
+    - Bias metrics (accuracy by demographic if available)
+    - Kafka audit logs for classifications
+
+human_oversight:
+  mechanism: "AI classifies, human verifies"
+  implementation:
+    - Low confidence (<0.8): Automatic approval requirement
+    - Visual QA: Always requires human verification
+    - Object detection: Bounding boxes reviewed
+    - Classification: Top-k predictions shown for context
+  escalation:
+    - Sensitive content: Flag for manual review
+    - Low confidence: Require approval
+    - Potential bias: Escalate to ethics review
+
+compliance:
+  regulations:
+    - EU AI Act: LIMITED risk (Article 52)
+    - GDPR: Article 22 (no automated decision-making)
+    - EU AI Act Article 5: Prohibited practices (biometrics, etc.)
+
+  privacy_features:
+    - No biometric identification
+    - No emotion recognition
+    - No face database matching
+    - Image anonymization recommended
+
+  supported_formats:
+    - JPEG
+    - PNG
+    - WebP
+    - BMP
+
+  model_card_version: 1.0
+  last_updated: "2026-02-08"
+  next_review: "2026-08-08"  # 6 months
+
+warnings:
+  - Do NOT use for biometric identification (UNACCEPTABLE)
+  - Do NOT use for emotion recognition without special approval
+  - Do NOT use for real-time surveillance
+  - Always verify classifications for critical decisions
+  - Monitor for bias in predictions

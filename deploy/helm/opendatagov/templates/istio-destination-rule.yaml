@@ -1,0 +1,182 @@
+{{- if .Values.istio.enabled }}
+---
+# Global TLS settings for all services
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-mtls-global
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: istio-networking
+spec:
+  host: "*.{{ .Release.Namespace }}.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL  # Use Istio mutual TLS
+
+---
+# Governance Engine TLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-governance-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: governance-engine
+spec:
+  host: governance-engine.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 2
+    loadBalancer:
+      simple: LEAST_REQUEST
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+
+---
+# Lakehouse Agent TLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-lakehouse-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lakehouse-agent
+spec:
+  host: lakehouse-agent.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 100
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutiveErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+
+---
+# Quality Gate TLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-quality-gate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: quality-gate
+spec:
+  host: quality-gate.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+    loadBalancer:
+      simple: LEAST_REQUEST
+
+---
+# Data Expert TLS
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-data-expert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data-expert
+spec:
+  host: data-expert.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 25
+        http2MaxRequests: 50
+    loadBalancer:
+      simple: ROUND_ROBIN
+    # Longer timeout for AI processing
+    timeout: 300s
+
+---
+# PostgreSQL TLS (external to mesh)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-postgresql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  host: postgresql.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE  # PostgreSQL handles its own TLS
+    connectionPool:
+      tcp:
+        maxConnections: 200
+
+---
+# Redis TLS (external to mesh)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  host: redis-master.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE  # Redis handles its own TLS
+    connectionPool:
+      tcp:
+        maxConnections: 100
+
+---
+# Kafka TLS (external to mesh, uses SASL)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-kafka
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka
+spec:
+  host: kafka.{{ .Release.Namespace }}.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE  # Kafka uses its own TLS + SASL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+
+{{- end }}

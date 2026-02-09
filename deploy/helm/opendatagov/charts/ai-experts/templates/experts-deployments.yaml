@@ -1,0 +1,254 @@
+# Code Expert Deployment
+{{- if .Values.codeExpert.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-experts.fullname" . }}-code-expert
+  labels:
+    {{- include "ai-experts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: code-expert
+spec:
+  {{- if not .Values.codeExpert.autoscaling.enabled }}
+  replicas: {{ .Values.codeExpert.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ai-experts.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: code-expert
+  template:
+    metadata:
+      labels:
+        {{- include "ai-experts.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: code-expert
+    spec:
+      serviceAccountName: {{ include "ai-experts.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: code-expert
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.global.imageRegistry }}/{{ .Values.codeExpert.image.repository }}:{{ .Values.codeExpert.image.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.codeExpert.service.port }}
+        env:
+        {{- toYaml .Values.codeExpert.env | nindent 8 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.codeExpert.resources | nindent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-experts.fullname" . }}-code-expert
+  labels:
+    {{- include "ai-experts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: code-expert
+spec:
+  type: {{ .Values.codeExpert.service.type }}
+  ports:
+  - port: {{ .Values.codeExpert.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "ai-experts.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: code-expert
+{{- end }}
+
+---
+
+# Vision Expert Deployment
+{{- if .Values.visionExpert.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-experts.fullname" . }}-vision-expert
+  labels:
+    {{- include "ai-experts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vision-expert
+spec:
+  {{- if not .Values.visionExpert.autoscaling.enabled }}
+  replicas: {{ .Values.visionExpert.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ai-experts.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: vision-expert
+  template:
+    metadata:
+      labels:
+        {{- include "ai-experts.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: vision-expert
+    spec:
+      serviceAccountName: {{ include "ai-experts.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: vision-expert
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.global.imageRegistry }}/{{ .Values.visionExpert.image.repository }}:{{ .Values.visionExpert.image.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.visionExpert.service.port }}
+        env:
+        {{- toYaml .Values.visionExpert.env | nindent 8 }}
+        {{- if .Values.visionExpert.gpu.enabled }}
+        resources:
+          limits:
+            nvidia.com/gpu: {{ .Values.visionExpert.gpu.count }}
+          {{- with .Values.visionExpert.resources.limits }}
+            cpu: {{ .cpu }}
+            memory: {{ .memory }}
+          {{- end }}
+          requests:
+          {{- toYaml .Values.visionExpert.resources.requests | nindent 10 }}
+        {{- else }}
+        resources:
+          {{- toYaml .Values.visionExpert.resources | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      {{- if .Values.visionExpert.gpu.enabled }}
+      nodeSelector:
+        gpu: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-experts.fullname" . }}-vision-expert
+  labels:
+    {{- include "ai-experts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vision-expert
+spec:
+  type: {{ .Values.visionExpert.service.type }}
+  ports:
+  - port: {{ .Values.visionExpert.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "ai-experts.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: vision-expert
+{{- end }}
+
+---
+
+# NLP Expert Deployment
+{{- if .Values.nlpExpert.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-experts.fullname" . }}-nlp-expert
+  labels:
+    {{- include "ai-experts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nlp-expert
+spec:
+  {{- if not .Values.nlpExpert.autoscaling.enabled }}
+  replicas: {{ .Values.nlpExpert.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ai-experts.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nlp-expert
+  template:
+    metadata:
+      labels:
+        {{- include "ai-experts.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: nlp-expert
+    spec:
+      serviceAccountName: {{ include "ai-experts.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: nlp-expert
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.global.imageRegistry }}/{{ .Values.nlpExpert.image.repository }}:{{ .Values.nlpExpert.image.tag }}"
+        imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.nlpExpert.service.port }}
+        env:
+        {{- toYaml .Values.nlpExpert.env | nindent 8 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.nlpExpert.resources | nindent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-experts.fullname" . }}-nlp-expert
+  labels:
+    {{- include "ai-experts.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nlp-expert
+spec:
+  type: {{ .Values.nlpExpert.service.type }}
+  ports:
+  - port: {{ .Values.nlpExpert.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "ai-experts.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: nlp-expert
+{{- end }}

@@ -1,0 +1,212 @@
+syntax = "proto3";
+
+package cosmos.federation.v1;
+
+option go_package = "github.com/silvanoneto/opendatagov/services/federation-service/proto;federation";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// COSMOS Federation Service
+// Enables secure multi-instance data sharing and discovery
+service FederationService {
+  // Register this instance in the federation registry
+  rpc RegisterInstance(InstanceInfo) returns (RegistrationResponse);
+
+  // Discover other federated instances
+  rpc DiscoverInstances(DiscoveryRequest) returns (stream InstanceInfo);
+
+  // Create a data sharing agreement between instances
+  rpc CreateSharingAgreement(SharingAgreement) returns (AgreementResponse);
+
+  // Get sharing agreement details
+  rpc GetSharingAgreement(GetAgreementRequest) returns (SharingAgreement);
+
+  // Revoke a sharing agreement
+  rpc RevokeSharingAgreement(RevokeRequest) returns (google.protobuf.Empty);
+
+  // Query dataset metadata from a remote instance
+  rpc QueryRemoteDataset(RemoteDatasetRequest) returns (DatasetMetadata);
+
+  // Execute federated lineage query across instances
+  rpc FederatedLineageQuery(LineageRequest) returns (LineageGraph);
+
+  // Health check for remote instance
+  rpc PingInstance(PingRequest) returns (PongResponse);
+}
+
+// Instance Information
+message InstanceInfo {
+  string instance_id = 1;           // Unique instance identifier (e.g., "opendatagov-eu")
+  string instance_name = 2;         // Human-readable name
+  string graphql_endpoint = 3;      // GraphQL API URL
+  string grpc_endpoint = 4;         // gRPC API URL
+  string region = 5;                // Deployment region (e.g., "eu-west-1")
+  string organization = 6;          // Organization name
+  repeated string shared_namespaces = 7; // Namespaces available for sharing
+  google.protobuf.Timestamp registered_at = 8;
+  InstanceStatus status = 9;
+  map<string, string> metadata = 10; // Additional metadata
+}
+
+enum InstanceStatus {
+  INSTANCE_STATUS_UNSPECIFIED = 0;
+  INSTANCE_STATUS_ACTIVE = 1;
+  INSTANCE_STATUS_MAINTENANCE = 2;
+  INSTANCE_STATUS_UNREACHABLE = 3;
+}
+
+message RegistrationResponse {
+  bool success = 1;
+  string message = 2;
+  google.protobuf.Timestamp expires_at = 3; // Registration TTL
+}
+
+// Discovery Request
+message DiscoveryRequest {
+  string region = 1;                // Filter by region (optional)
+  string organization = 2;          // Filter by organization (optional)
+  repeated string capabilities = 3; // Filter by capabilities (optional)
+}
+
+// Data Sharing Agreement
+message SharingAgreement {
+  string agreement_id = 1;
+  string source_instance_id = 2;    // Instance sharing data
+  string target_instance_id = 3;    // Instance consuming data
+  repeated string shared_datasets = 4; // Dataset IDs allowed
+  AccessLevel access_level = 5;
+
+  // Governance
+  map<string, string> raci_approvals = 6; // RACI role -> approver email
+  repeated string compliance_frameworks = 7; // GDPR, LGPD, HIPAA, etc.
+
+  // Security
+  bool encryption_required = 8;
+  repeated string allowed_ips = 9;
+
+  // Lifecycle
+  google.protobuf.Timestamp valid_from = 10;
+  google.protobuf.Timestamp valid_until = 11;
+  bool revoked = 12;
+  google.protobuf.Timestamp created_at = 13;
+  string created_by = 14;
+}
+
+enum AccessLevel {
+  ACCESS_LEVEL_UNSPECIFIED = 0;
+  ACCESS_LEVEL_METADATA_ONLY = 1;  // Only schema, stats, lineage
+  ACCESS_LEVEL_READ_ONLY = 2;      // Read data (requires snapshot sync)
+  ACCESS_LEVEL_FULL = 3;           // Read + write (rare)
+}
+
+message AgreementResponse {
+  bool success = 1;
+  string agreement_id = 2;
+  string message = 3;
+}
+
+message GetAgreementRequest {
+  string agreement_id = 1;
+}
+
+message RevokeRequest {
+  string agreement_id = 1;
+  string reason = 2;
+  string revoked_by = 3;
+}
+
+// Remote Dataset Query
+message RemoteDatasetRequest {
+  string instance_id = 1;
+  string dataset_id = 2;           // e.g., "gold/customers"
+  string agreement_id = 3;         // Required for authorization
+  bool include_schema = 4;
+  bool include_stats = 5;
+  bool include_lineage = 6;
+}
+
+message DatasetMetadata {
+  string dataset_id = 1;
+  string namespace = 2;
+  string table_name = 3;
+
+  // Schema
+  repeated ColumnSchema schema = 4;
+
+  // Stats
+  int64 row_count = 5;
+  int64 size_bytes = 6;
+  google.protobuf.Timestamp last_modified = 7;
+
+  // Versioning
+  string current_snapshot_id = 8;
+  int32 total_snapshots = 9;
+
+  // Governance
+  string owner = 10;
+  repeated string tags = 11;
+  double quality_score = 12;
+
+  // Lineage (if requested)
+  LineageGraph lineage = 13;
+}
+
+message ColumnSchema {
+  string name = 1;
+  string type = 2;
+  bool nullable = 3;
+  string description = 4;
+}
+
+// Federated Lineage Query
+message LineageRequest {
+  string dataset_id = 1;
+  int32 max_depth = 2;              // Max traversal depth
+  bool include_remote = 3;          // Include cross-instance edges
+  LineageDirection direction = 4;
+}
+
+enum LineageDirection {
+  LINEAGE_DIRECTION_UNSPECIFIED = 0;
+  LINEAGE_DIRECTION_UPSTREAM = 1;   // Dependencies
+  LINEAGE_DIRECTION_DOWNSTREAM = 2; // Consumers
+  LINEAGE_DIRECTION_BOTH = 3;
+}
+
+message LineageGraph {
+  repeated LineageNode nodes = 1;
+  repeated LineageEdge edges = 2;
+  int32 node_count = 3;
+  int32 edge_count = 4;
+}
+
+message LineageNode {
+  string id = 1;
+  string label = 2;                 // Dataset, Pipeline, Model, Feature
+  string instance_id = 3;           // null = local, value = remote
+  string remote_url = 4;            // Only if remote
+  map<string, string> properties = 5;
+}
+
+message LineageEdge {
+  string id = 1;
+  string label = 2;                 // DERIVED_FROM, REMOTE_DERIVED_FROM, etc.
+  string source_id = 3;
+  string target_id = 4;
+  bool is_remote = 5;
+  map<string, string> properties = 6;
+}
+
+// Ping/Pong for health checks
+message PingRequest {
+  string instance_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message PongResponse {
+  string instance_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  int64 latency_ms = 3;
+  InstanceStatus status = 4;
+}

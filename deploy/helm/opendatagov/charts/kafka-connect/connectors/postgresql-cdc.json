@@ -1,0 +1,55 @@
+{
+  "name": "odg-postgresql-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "2",
+
+    "database.hostname": "postgresql",
+    "database.port": "5432",
+    "database.user": "postgres",
+    "database.password": "postgres",
+    "database.dbname": "odg",
+    "database.server.name": "odg_postgres",
+
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_odg",
+    "publication.name": "debezium_publication",
+
+    "table.include.list": "public.governance_decisions,public.approval_records,public.veto_records,public.audit_events,public.pipeline_versions,public.pipeline_executions,public.lineage_events,public.model_cards,public.quality_reports,public.data_contracts",
+
+    "snapshot.mode": "initial",
+
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "true",
+
+    "topic.prefix": "cdc.odg",
+    "topic.creation.default.replication.factor": 1,
+    "topic.creation.default.partitions": 3,
+    "topic.creation.default.cleanup.policy": "compact",
+    "topic.creation.default.retention.ms": 604800000,
+
+    "transforms": "route,unwrap",
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "([^.]+)\\.([^.]+)\\.([^.]+)",
+    "transforms.route.replacement": "$1.$2.$3",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "transforms.unwrap.add.fields": "table,lsn,source.ts_ms",
+
+    "heartbeat.interval.ms": "10000",
+    "heartbeat.topics.prefix": "__debezium-heartbeat",
+
+    "decimal.handling.mode": "double",
+    "time.precision.mode": "adaptive_time_microseconds",
+
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:9092",
+    "schema.history.internal.kafka.topic": "schema-changes.odg",
+
+    "errors.tolerance": "all",
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true"
+  }
+}

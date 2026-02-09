@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from odg_core.auth.dependencies import get_current_user, require_role
+from odg_core.auth.models import UserContext
+from odg_core.enums import RACIRole
 
 from governance_engine.api.deps import RoleServiceDep
 from governance_engine.api.schemas import AssignRoleRequest, RoleAssignmentResponse
@@ -16,6 +19,7 @@ router = APIRouter(prefix="/api/v1/roles", tags=["roles"])
 async def assign_role(
     body: AssignRoleRequest,
     service: RoleServiceDep,
+    user: UserContext = Depends(require_role(RACIRole.ACCOUNTABLE)),
 ) -> RoleAssignmentResponse:
     try:
         assignment = await service.assign_role(
@@ -34,6 +38,7 @@ async def revoke_role(
     assignment_id: uuid.UUID,
     revoked_by: str,
     service: RoleServiceDep,
+    user: UserContext = Depends(require_role(RACIRole.ACCOUNTABLE)),
 ) -> None:
     try:
         await service.revoke_role(assignment_id, revoked_by)
@@ -45,6 +50,7 @@ async def revoke_role(
 async def get_domain_roles(
     domain_id: str,
     service: RoleServiceDep,
+    user: UserContext = Depends(get_current_user),
 ) -> list[RoleAssignmentResponse]:
     assignments = await service.get_assignments_for_domain(domain_id)
     return [RoleAssignmentResponse.model_validate(a, from_attributes=True) for a in assignments]
@@ -54,6 +60,7 @@ async def get_domain_roles(
 async def get_user_roles(
     user_id: str,
     service: RoleServiceDep,
+    user: UserContext = Depends(get_current_user),
 ) -> list[RoleAssignmentResponse]:
     assignments = await service.get_assignments_for_user(user_id)
     return [RoleAssignmentResponse.model_validate(a, from_attributes=True) for a in assignments]

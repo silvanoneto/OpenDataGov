@@ -1,0 +1,14 @@
+apiVersion: v2
+name: flink
+version: 0.1.0
+appVersion: "1.18.0"
+description: Apache Flink for real-time stream processing
+keywords:
+  - flink
+  - streaming
+  - real-time
+  - analytics
+  - stream-processing
+maintainers:
+  - name: OpenDataGov Team
+    email: governance@opendatagov.org

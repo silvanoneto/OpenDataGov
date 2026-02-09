@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mlflow.fullname" . }}
+  labels:
+    {{- include "mlflow.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "mlflow.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "mlflow.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mlflow.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: mlflow
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+          - mlflow
+          - server
+          - --host=0.0.0.0
+          - --port={{ .Values.service.targetPort }}
+          - --backend-store-uri=$(MLFLOW_BACKEND_STORE_URI)
+          - --default-artifact-root=$(MLFLOW_DEFAULT_ARTIFACT_ROOT)
+          {{- if .Values.backend.artifactStore.type }}
+          - --serve-artifacts
+          {{- end }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.backend.postgresql.existingSecret | default (printf "%s-postgresql" (include "mlflow.fullname" .)) }}
+              key: {{ .Values.backend.postgresql.secretKey | default "username" }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.backend.postgresql.existingSecret | default (printf "%s-postgresql" (include "mlflow.fullname" .)) }}
+              key: {{ .Values.backend.postgresql.secretKey | default "password" }}
+        {{- if eq .Values.backend.artifactStore.type "s3" }}
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.backend.artifactStore.s3.existingSecret | default (printf "%s-s3" (include "mlflow.fullname" .)) }}
+              key: {{ .Values.backend.artifactStore.s3.accessKeyIdKey | default "accessKeyId" }}
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.backend.artifactStore.s3.existingSecret | default (printf "%s-s3" (include "mlflow.fullname" .)) }}
+              key: {{ .Values.backend.artifactStore.s3.secretAccessKeyKey | default "secretAccessKey" }}
+        {{- end }}
+        envFrom:
+        - configMapRef:
+            name: {{ include "mlflow.fullname" . }}
+        {{- with .Values.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        {{- if eq .Values.backend.artifactStore.type "local" }}
+        - name: artifacts
+          mountPath: /mlflow/artifacts
+        {{- end }}
+        {{- with .Values.extraVolumeMounts }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      {{- if eq .Values.backend.artifactStore.type "local" }}
+      - name: artifacts
+        emptyDir: {}
+      {{- end }}
+      {{- with .Values.extraVolumes }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

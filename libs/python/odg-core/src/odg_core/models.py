@@ -49,7 +49,7 @@ class GovernanceDecision(BaseModel):
     created_by: str = Field(min_length=1, max_length=200)
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
-    metadata: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     # Promotion-specific fields (composed via PromotionMetadata)
     promotion: PromotionMetadata | None = None

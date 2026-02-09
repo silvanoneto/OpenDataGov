@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubeflow-pipelines.fullname" . }}-config
+  labels:
+    {{- include "kubeflow-pipelines.labels" . | nindent 4 }}
+data:
+  # Database configuration
+  DB_HOST: {{ include "kubeflow-pipelines.postgresql.host" . | quote }}
+  DB_PORT: {{ .Values.apiServer.database.port | quote }}
+  DB_NAME: {{ .Values.apiServer.database.name | quote }}
+
+  # Object storage configuration
+  MINIO_HOST: {{ include "kubeflow-pipelines.minio.endpointUrl" . | quote }}
+  MINIO_BUCKET: {{ .Values.apiServer.objectStore.bucket | quote }}
+  ARTIFACT_BUCKET_PATH: {{ include "kubeflow-pipelines.artifacts.bucketPath" . | quote }}
+
+  # Governance configuration
+  {{- if .Values.governance.enabled }}
+  GOVERNANCE_ENABLED: "true"
+  QUALITY_GATE_URL: {{ .Values.governance.qualityGateUrl | quote }}
+  MIN_DQ_SCORE: {{ .Values.governance.minDQScore | quote }}
+  GOVERNANCE_ENGINE_URL: {{ .Values.governance.governanceEngineUrl | quote }}
+  {{- else }}
+  GOVERNANCE_ENABLED: "false"
+  {{- end }}
+
+  # ML Metadata configuration
+  MLMD_CONNECTION_STRING: {{ include "kubeflow-pipelines.mlmd.connectionString" . | quote }}
+
+  # GPU configuration
+  {{- if .Values.gpu.enabled }}
+  GPU_ENABLED: "true"
+  GPU_RESOURCE_NAME: {{ .Values.gpu.resourceName | quote }}
+  {{- else }}
+  GPU_ENABLED: "false"
+  {{- end }}

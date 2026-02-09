@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mlflow.fullname" . }}
+  labels:
+    {{- include "mlflow.labels" . | nindent 4 }}
+data:
+  MLFLOW_BACKEND_STORE_URI: {{ include "mlflow.postgresql.connectionString" . | quote }}
+  MLFLOW_DEFAULT_ARTIFACT_ROOT: {{ include "mlflow.artifactStore.uri" . | quote }}
+  {{- if eq .Values.backend.artifactStore.type "s3" }}
+  MLFLOW_S3_ENDPOINT_URL: {{ include "mlflow.minio.endpointUrl" . | quote }}
+  {{- end }}
+  {{- if .Values.governance.enabled }}
+  GOVERNANCE_ENABLED: "true"
+  GOVERNANCE_ENGINE_URL: {{ .Values.governance.governanceEngineUrl | quote }}
+  PROMOTION_REQUIRES_APPROVAL: {{ .Values.governance.promotionRequiresApproval | quote }}
+  {{- else }}
+  GOVERNANCE_ENABLED: "false"
+  {{- end }}

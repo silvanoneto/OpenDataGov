@@ -1,0 +1,73 @@
+[project]
+name = "odg-cli"
+version = "0.1.0"
+description = "OpenDataGov command-line interface"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "Apache-2.0" }
+authors = [{ name = "OpenDataGov Contributors" }]
+keywords = ["data-governance", "cli", "opendatagov"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "rich>=13.7.0",
+    "odg-sdk>=0.1.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+    "mypy>=1.14.0",
+]
+
+[project.scripts]
+odg = "odg_cli.main:cli"
+
+[project.urls]
+Homepage = "https://github.com/opendatagov/opendatagov"
+Documentation = "https://opendatagov.readthedocs.io"
+Repository = "https://github.com/opendatagov/opendatagov"
+Issues = "https://github.com/opendatagov/opendatagov/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/odg_cli"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=odg_cli --cov-report=term-missing --cov-fail-under=95"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "T20", "SIM", "TCH"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

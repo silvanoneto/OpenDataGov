@@ -8,6 +8,7 @@ COMPOSE_FULL := deploy/docker-compose/docker-compose.full.yml
 COMPOSE_DATAHUB := deploy/docker-compose/docker-compose.datahub.yml
 COMPOSE_AUTH := deploy/docker-compose/docker-compose.auth.yml
 COMPOSE_VAULT := deploy/docker-compose/docker-compose.vault.yml
+DEPLOY_DIR := deploy/docker-compose
 KIND_CLUSTER := opendatagov
 TOFU_DIR := deploy/tofu
 APP_IMAGES := opendatagov/governance-engine opendatagov/lakehouse-agent opendatagov/data-expert opendatagov/quality-gate opendatagov/gateway
@@ -74,43 +75,77 @@ build: ## Build all Docker images via docker compose
 	done
 	@echo "==> Tagged images: $(APP_IMAGES)"
 
-# ─── Compose ──────────────────────────────────────────────
+# ─── Compose (Profile-based) ─────────────────────────────
 
-compose-up: ## Start quick-start stack
-	docker compose -f $(COMPOSE_FILE) up -d
+PROFILE ?= dev
 
-compose-down: ## Stop stack
-	docker compose -f $(COMPOSE_FILE) down
+compose-embedded: ## Start embedded profile (edge computing, 1-2 vCPU, 2-4GB RAM)
+	$(MAKE) compose-up PROFILE=embedded
 
-compose-full-up: ## Start full stack (with Kafka, Grafana, VictoriaMetrics)
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) up -d
+compose-dev: ## Start dev profile (local development, 4 vCPU, 16GB RAM)
+	$(MAKE) compose-up PROFILE=dev
 
-compose-full-down: ## Stop full stack
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) down
+compose-small: ## Start small profile (small teams, 16 vCPU, 64GB RAM)
+	$(MAKE) compose-up PROFILE=small
 
-compose-datahub-up: ## Start DataHub catalog stack
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) -f $(COMPOSE_DATAHUB) up -d
+compose-medium: ## Start medium profile (enterprise, 64 vCPU, 256GB RAM, 1 GPU)
+	$(MAKE) compose-up PROFILE=medium
 
-compose-datahub-down: ## Stop DataHub catalog stack
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) -f $(COMPOSE_DATAHUB) down
+compose-large: ## Start large profile (large-scale, 256+ vCPU, 1TB+ RAM, 2+ GPUs)
+	$(MAKE) compose-up PROFILE=large
 
-compose-auth-up: ## Start auth stack (Keycloak + OPA)
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_AUTH) up -d
+compose-up: ## Start OpenDataGov (PROFILE=embedded|dev|small|medium|large)
+	@cd $(DEPLOY_DIR) && ./scripts/compose-up.sh $(PROFILE)
 
-compose-auth-down: ## Stop auth stack
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_AUTH) down
+compose-down: ## Stop OpenDataGov (PROFILE=embedded|dev|small|medium|large)
+	@cd $(DEPLOY_DIR) && ./scripts/compose-down.sh $(PROFILE)
 
-compose-vault-up: ## Start Vault stack
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_VAULT) up -d
+compose-logs: ## Tail logs (PROFILE=embedded|dev|small|medium|large)
+	@cd $(DEPLOY_DIR) && docker compose -f profiles/$(PROFILE).yml logs -f
 
-compose-vault-down: ## Stop Vault stack
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_VAULT) down
+compose-validate: ## Validate profile configuration (PROFILE=embedded|dev|small|medium|large)
+	@cd $(DEPLOY_DIR) && ./scripts/validate-profile.sh $(PROFILE)
 
-compose-all-up: ## Start all stacks
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_FULL) -f $(COMPOSE_DATAHUB) -f $(COMPOSE_AUTH) -f $(COMPOSE_VAULT) up -d
+compose-health: ## Check service health (PROFILE=embedded|dev|small|medium|large)
+	@cd $(DEPLOY_DIR) && ./scripts/health-check.sh $(PROFILE)
 
-compose-logs: ## Tail logs from all services
-	docker compose -f $(COMPOSE_FILE) logs -f
+# ─── Compose (Deprecated - Backward Compatibility) ────────
+
+compose-full-up: ## [DEPRECATED] Use compose-small instead
+	@echo "Warning: compose-full-up is deprecated. Use 'make compose-small' instead."
+	$(MAKE) compose-small
+
+compose-full-down: ## [DEPRECATED] Use compose-down PROFILE=small instead
+	@echo "Warning: compose-full-down is deprecated. Use 'make compose-down PROFILE=small' instead."
+	$(MAKE) compose-down PROFILE=small
+
+compose-datahub-up: ## [DEPRECATED] Use compose-small instead
+	@echo "Warning: compose-datahub-up is deprecated. Use 'make compose-small' instead."
+	$(MAKE) compose-small
+
+compose-datahub-down: ## [DEPRECATED] Use compose-down PROFILE=small instead
+	@echo "Warning: compose-datahub-down is deprecated. Use 'make compose-down PROFILE=small' instead."
+	$(MAKE) compose-down PROFILE=small
+
+compose-auth-up: ## [DEPRECATED] Use compose-small instead
+	@echo "Warning: compose-auth-up is deprecated. Use 'make compose-small' instead."
+	$(MAKE) compose-small
+
+compose-auth-down: ## [DEPRECATED] Use compose-down PROFILE=small instead
+	@echo "Warning: compose-auth-down is deprecated. Use 'make compose-down PROFILE=small' instead."
+	$(MAKE) compose-down PROFILE=small
+
+compose-vault-up: ## [DEPRECATED] Use compose-small instead
+	@echo "Warning: compose-vault-up is deprecated. Use 'make compose-small' instead."
+	$(MAKE) compose-small
+
+compose-vault-down: ## [DEPRECATED] Use compose-down PROFILE=small instead
+	@echo "Warning: compose-vault-down is deprecated. Use 'make compose-down PROFILE=small' instead."
+	$(MAKE) compose-down PROFILE=small
+
+compose-all-up: ## [DEPRECATED] Use compose-large instead
+	@echo "Warning: compose-all-up is deprecated. Use 'make compose-large' instead."
+	$(MAKE) compose-large
 
 # ─── Quick Start ─────────────────────────────────────────
 

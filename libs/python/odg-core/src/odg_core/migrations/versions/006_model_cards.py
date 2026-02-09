@@ -32,6 +32,12 @@ def upgrade() -> None:
         sa.Column("ethics", JSONB, server_default="{}"),
         sa.Column("limitations", JSONB, server_default="[]"),
         sa.Column("regulatory_requirements", JSONB, server_default="[]"),
+        # MLflow integration (Phase 1: MLOps Foundation)
+        sa.Column("mlflow_experiment_id", sa.String(100), nullable=True),
+        sa.Column("mlflow_run_id", sa.String(100), nullable=True),
+        sa.Column("mlflow_model_uri", sa.String(500), nullable=True),
+        sa.Column("mlflow_version", sa.Integer, nullable=True),
+        sa.Column("mlflow_stage", sa.String(20), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("last_reviewed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("approved_by", sa.String(200), nullable=True),

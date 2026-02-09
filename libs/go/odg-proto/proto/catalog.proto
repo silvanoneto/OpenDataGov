@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package odg.proto.v1;
+
+option go_package = "github.com/silvanoneto/opendatagov/libs/go/odg-proto/gen/go/v1";
+
+import "google/protobuf/timestamp.proto";
+
+// DataLayer represents the medallion architecture layer.
+enum DataLayer {
+  DATA_LAYER_UNSPECIFIED = 0;
+  DATA_LAYER_BRONZE = 1;
+  DATA_LAYER_SILVER = 2;
+  DATA_LAYER_GOLD = 3;
+  DATA_LAYER_PLATINUM = 4;
+}
+
+// DataClassification represents the data sensitivity level.
+enum DataClassification {
+  DATA_CLASSIFICATION_UNSPECIFIED = 0;
+  DATA_CLASSIFICATION_PUBLIC = 1;
+  DATA_CLASSIFICATION_INTERNAL = 2;
+  DATA_CLASSIFICATION_SENSITIVE = 3;
+  DATA_CLASSIFICATION_CONFIDENTIAL = 4;
+}
+
+// Dataset represents a dataset in the catalog.
+message Dataset {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  DataLayer layer = 4;
+  DataClassification classification = 5;
+  string domain_id = 6;
+  string owner_id = 7;
+  repeated string tags = 8;
+  map<string, string> properties = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  string datahub_urn = 12;
+}
+
+// LineageEdge represents a lineage relationship between datasets.
+message LineageEdge {
+  string from_dataset_id = 1;
+  string to_dataset_id = 2;
+  string edge_type = 3;
+  map<string, string> metadata = 4;
+}
+
+// LineageGraph represents the lineage graph for a dataset.
+message LineageGraph {
+  repeated Dataset nodes = 1;
+  repeated LineageEdge edges = 2;
+  int32 depth = 3;
+}
+
+// Request to get a dataset by ID.
+message GetDatasetRequest {
+  string id = 1;
+}
+
+// Request to list datasets with filters.
+message ListDatasetsRequest {
+  string domain_id = 1;
+  DataLayer layer = 2;
+  DataClassification classification = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+// Response containing list of datasets.
+message ListDatasetsResponse {
+  repeated Dataset datasets = 1;
+  int32 total_count = 2;
+}
+
+// Request to get lineage graph for a dataset.
+message GetLineageRequest {
+  string dataset_id = 1;
+  int32 depth = 2;
+  bool include_upstream = 3;
+  bool include_downstream = 4;
+}
+
+// Request to register a new dataset in the catalog.
+message RegisterDatasetRequest {
+  string name = 1;
+  string description = 2;
+  DataLayer layer = 3;
+  DataClassification classification = 4;
+  string domain_id = 5;
+  string owner_id = 6;
+  repeated string tags = 7;
+  map<string, string> properties = 8;
+}
+
+// CatalogService provides gRPC endpoints for dataset catalog operations.
+service CatalogService {
+  // Get a dataset by ID.
+  rpc GetDataset(GetDatasetRequest) returns (Dataset);
+
+  // List datasets with optional filters.
+  rpc ListDatasets(ListDatasetsRequest) returns (ListDatasetsResponse);
+
+  // Get lineage graph for a dataset.
+  rpc GetLineage(GetLineageRequest) returns (LineageGraph);
+
+  // Register a new dataset in the catalog.
+  rpc RegisterDataset(RegisterDatasetRequest) returns (Dataset);
+}

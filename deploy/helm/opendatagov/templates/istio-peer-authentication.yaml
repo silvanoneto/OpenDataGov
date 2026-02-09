@@ -1,0 +1,141 @@
+{{- if .Values.istio.enabled }}
+---
+# Namespace-wide mTLS enforcement (ADR-073)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-default-mtls
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: istio-security
+spec:
+  mtls:
+    mode: STRICT  # Enforce mTLS for all services in the namespace
+
+---
+# Allow plaintext for specific ports (health checks, metrics)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-health-metrics-permissive
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: istio-security
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: opendatagov
+  portLevelMtls:
+    # Health check endpoints (allow plaintext for k8s probes)
+    8080:
+      mode: PERMISSIVE
+    8090:
+      mode: PERMISSIVE
+    # Metrics endpoints (allow plaintext for Prometheus)
+    9090:
+      mode: PERMISSIVE
+    9091:
+      mode: PERMISSIVE
+
+---
+# Governance Engine mTLS (gRPC on 50051)
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-governance-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: governance-engine
+spec:
+  selector:
+    matchLabels:
+      app: governance-engine
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    # gRPC port - strict mTLS
+    50051:
+      mode: STRICT
+    # HTTP API - strict mTLS
+    8000:
+      mode: STRICT
+    # Health check - permissive
+    8080:
+      mode: PERMISSIVE
+
+---
+# Lakehouse Agent mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-lakehouse-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lakehouse-agent
+spec:
+  selector:
+    matchLabels:
+      app: lakehouse-agent
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    # API port - strict mTLS
+    8001:
+      mode: STRICT
+    # Health check - permissive
+    8080:
+      mode: PERMISSIVE
+
+---
+# Quality Gate mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-quality-gate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: quality-gate
+spec:
+  selector:
+    matchLabels:
+      app: quality-gate
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    # API port - strict mTLS
+    8002:
+      mode: STRICT
+    # Health check - permissive
+    8080:
+      mode: PERMISSIVE
+
+---
+# Data Expert mTLS
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-data-expert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data-expert
+spec:
+  selector:
+    matchLabels:
+      app: data-expert
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    # API port - strict mTLS
+    8003:
+      mode: STRICT
+    # Health check - permissive
+    8080:
+      mode: PERMISSIVE
+
+{{- end }}

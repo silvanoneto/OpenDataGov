@@ -76,3 +76,50 @@ class VaultClient:
         result = client.secrets.transit.decrypt_data(name=key_name, ciphertext=ciphertext)
         plaintext: str = result["data"]["plaintext"]
         return plaintext
+
+    def get_database_credentials(self, role: str = "odg-app") -> dict[str, Any]:
+        """Get dynamic database credentials from Vault.
+
+        Returns:
+            Dict with keys: username, password, lease_id, lease_duration
+        """
+        client = self._ensure_client()
+        response = client.secrets.database.generate_credentials(name=role)
+
+        return {
+            "username": response["data"]["username"],
+            "password": response["data"]["password"],
+            "lease_id": response["lease_id"],
+            "lease_duration": response["lease_duration"],
+        }
+
+    def renew_database_lease(self, lease_id: str, increment: int | None = None) -> dict[str, Any]:
+        """Renew a database credential lease.
+
+        Args:
+            lease_id: The lease ID to renew
+            increment: Optional lease increment in seconds (default: use Vault default)
+
+        Returns:
+            Dict with renewed lease information
+        """
+        client = self._ensure_client()
+        if increment:
+            response = client.sys.renew_lease(lease_id=lease_id, increment=increment)
+        else:
+            response = client.sys.renew_lease(lease_id=lease_id)
+
+        return {
+            "lease_id": response["lease_id"],
+            "lease_duration": response["lease_duration"],
+            "renewable": response["renewable"],
+        }
+
+    def revoke_database_lease(self, lease_id: str) -> None:
+        """Revoke a database credential lease.
+
+        Args:
+            lease_id: The lease ID to revoke
+        """
+        client = self._ensure_client()
+        client.sys.revoke_lease(lease_id=lease_id)

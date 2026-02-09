@@ -1,0 +1,217 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: iceberg-retention-cleanup
+  namespace: lakehouse
+  labels:
+    app: iceberg-retention
+    component: cleanup
+spec:
+  # Run every Sunday at 2 AM
+  schedule: "0 2 * * 0"
+  timeZone: "UTC"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600  # 1 hour
+
+  jobTemplate:
+    metadata:
+      labels:
+        app: iceberg-retention
+        component: cleanup-job
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 7200  # 2 hours max runtime
+      ttlSecondsAfterFinished: 86400  # Clean up job after 24h
+
+      template:
+        metadata:
+          labels:
+            app: iceberg-retention
+            component: cleanup-pod
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8000"
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: iceberg-cleanup-sa
+
+          containers:
+            - name: cleanup
+              image: odg/lakehouse-agent:latest
+              imagePullPolicy: Always
+              command:
+                - python
+                - /scripts/iceberg_retention_cleanup.py
+              args:
+                - --all
+                - --execute  # Actually execute cleanup (not dry-run)
+                - --keep-last
+                - "30"
+                - --keep-days
+                - "90"
+                - --production-keep-days
+                - "730"
+
+              env:
+                - name: ICEBERG_REST_URL
+                  value: "http://iceberg-rest:8181"
+                - name: S3_ENDPOINT
+                  value: "http://minio:9000"
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-credentials
+                      key: access-key
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: minio-credentials
+                      key: secret-key
+                - name: WAREHOUSE_PATH
+                  value: "s3://odg-lakehouse/"
+                - name: LOG_LEVEL
+                  value: "INFO"
+
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "1Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+
+              volumeMounts:
+                - name: scripts
+                  mountPath: /scripts
+                  readOnly: true
+
+          volumes:
+            - name: scripts
+              configMap:
+                name: iceberg-retention-scripts
+                defaultMode: 0755
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: iceberg-cleanup-sa
+  namespace: lakehouse
+  labels:
+    app: iceberg-retention
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: iceberg-cleanup-role
+  namespace: lakehouse
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: iceberg-cleanup-rolebinding
+  namespace: lakehouse
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: iceberg-cleanup-role
+subjects:
+  - kind: ServiceAccount
+    name: iceberg-cleanup-sa
+    namespace: lakehouse
+
+---
+# ConfigMap containing the cleanup script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iceberg-retention-scripts
+  namespace: lakehouse
+data:
+  iceberg_retention_cleanup.py: |
+    # Script will be populated from /scripts/iceberg_retention_cleanup.py
+    # In production, build this into the Docker image or use a ConfigMap mount
+
+---
+# Optional: Manual Job to run cleanup on-demand
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: iceberg-retention-cleanup-manual
+  namespace: lakehouse
+  labels:
+    app: iceberg-retention
+    component: manual-cleanup
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+
+  template:
+    metadata:
+      labels:
+        app: iceberg-retention
+        component: manual-cleanup-pod
+    spec:
+      restartPolicy: Never
+      serviceAccountName: iceberg-cleanup-sa
+
+      containers:
+        - name: cleanup
+          image: odg/lakehouse-agent:latest
+          imagePullPolicy: Always
+          command:
+            - python
+            - /scripts/iceberg_retention_cleanup.py
+          args:
+            - --all
+            - --dry-run  # Dry run by default for manual execution
+            - --keep-last
+            - "30"
+            - --keep-days
+            - "90"
+
+          env:
+            - name: ICEBERG_REST_URL
+              value: "http://iceberg-rest:8181"
+            - name: S3_ENDPOINT
+              value: "http://minio:9000"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: secret-key
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+
+      volumes:
+        - name: scripts
+          configMap:
+            name: iceberg-retention-scripts
+            defaultMode: 0755

@@ -6,10 +6,12 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     Uuid,
@@ -211,3 +213,138 @@ class ContractVersionRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
     contract: Mapped[DataContractRow] = relationship(back_populates="versions")
+
+
+class PipelineVersionRow(Base):
+    """Versions of data pipelines (Kubeflow, Airflow, Spark, etc.)."""
+
+    __tablename__ = "pipeline_versions"
+
+    pipeline_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # DAG definition (KFP YAML, Airflow Python code structure, etc.)
+    dag_definition: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=False)
+    dag_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    git_commit: Mapped[str | None] = mapped_column(String(100))
+
+    # Transformation code (SQL/Python)
+    transformation_code: Mapped[str | None] = mapped_column(Text)
+    transformation_hash: Mapped[str | None] = mapped_column(String(64))
+
+    # Metadata
+    created_by: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    __table_args__ = (Index("ix_pipeline_active", "pipeline_id", "is_active"),)
+
+
+class PipelineExecutionRow(Base):
+    """Historical executions of data pipelines."""
+
+    __tablename__ = "pipeline_executions"
+
+    run_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    pipeline_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    pipeline_version: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Execution metadata
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+
+    # Input/Output dataset tracking
+    input_datasets: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
+    output_datasets: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
+
+    # Error tracking
+    error_message: Mapped[str | None] = mapped_column(Text)
+    error_stacktrace: Mapped[str | None] = mapped_column(Text)
+
+    # Metrics
+    rows_processed: Mapped[int | None] = mapped_column(BigInteger)
+    bytes_processed: Mapped[int | None] = mapped_column(BigInteger)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    __table_args__ = (
+        Index("ix_pipeline_executions_pipeline", "pipeline_id", "pipeline_version"),
+        Index("ix_pipeline_executions_status", "status"),
+        Index("ix_pipeline_executions_start_time", "start_time"),
+    )
+
+
+class LineageEventRow(Base):
+    """OpenLineage events persisted to database for queryability.
+
+    Stores lineage events from all jobs (Spark, Airflow, Kubeflow, etc.)
+    for auditability and impact analysis.
+    """
+
+    __tablename__ = "lineage_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    event_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    # Job identification
+    job_namespace: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    job_name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    run_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+
+    # Lineage data
+    inputs: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
+    outputs: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB)
+
+    # Facets (metadata)
+    job_facets: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    run_facets: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+
+    # Producer info
+    producer: Mapped[str | None] = mapped_column(String(200))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    __table_args__ = (
+        Index("ix_lineage_events_job", "job_namespace", "job_name"),
+        Index("ix_lineage_events_event_time", "event_time"),
+        Index("ix_lineage_events_event_type", "event_type"),
+    )
+
+
+class FeastMaterializationRow(Base):
+    """Tracks Feast feature materialization jobs with source lineage.
+
+    Records which pipeline/dataset generated which feature version,
+    enabling reproducibility and debugging of feature engineering.
+    """
+
+    __tablename__ = "feast_materializations"
+
+    run_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    feature_view: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    feature_names: Mapped[list[str] | None] = mapped_column(JSONB)
+
+    # Source lineage
+    source_pipeline_id: Mapped[str | None] = mapped_column(String(200), index=True)
+    source_pipeline_version: Mapped[int | None] = mapped_column(Integer)
+    source_dataset_id: Mapped[str | None] = mapped_column(String(500))
+    source_dataset_version: Mapped[str | None] = mapped_column(String(100))
+
+    # Materialization window
+    start_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    materialization_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    # Feature view version (hash of FeatureView definition)
+    feature_view_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+    __table_args__ = (
+        Index("ix_feast_mat_feature_view", "feature_view"),
+        Index("ix_feast_mat_source_pipeline", "source_pipeline_id", "source_pipeline_version"),
+        Index("ix_feast_mat_time", "materialization_time"),
+    )

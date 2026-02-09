@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "federation-service.fullname" . }}
+  labels:
+    {{- include "federation-service.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.monitoring.enabled }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "{{ .Values.monitoring.metrics.port }}"
+    prometheus.io/path: "{{ .Values.monitoring.metrics.path }}"
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: grpc
+    {{- if .Values.monitoring.enabled }}
+    - port: {{ .Values.monitoring.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
+  selector:
+    {{- include "federation-service.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,176 @@
+{{- if and .Values.postgresql.enabled .Values.postgresql.encryption.enabled }}
+---
+# PostgreSQL Encryption Initialization Job (ADR-073, Phase 5)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-postgresql-encryption-init
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql-encryption
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "25"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "opendatagov.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgresql-encryption
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: postgres-encryption-init
+        image: postgres:16
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: PGHOST
+            value: {{ include "opendatagov.fullname" . }}-postgresql
+          - name: PGPORT
+            value: "5432"
+          - name: PGUSER
+            value: {{ .Values.postgresql.auth.username | default "odg" }}
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "opendatagov.fullname" . }}-postgresql
+                key: password
+          - name: PGDATABASE
+            value: {{ .Values.postgresql.auth.database | default "odg" }}
+        command:
+          - /bin/bash
+          - -c
+          - |
+            set -e
+            echo "=== PostgreSQL Encryption Initialization ==="
+
+            # Wait for PostgreSQL
+            until pg_isready -h ${PGHOST} -p ${PGPORT} -U ${PGUSER}; do
+              echo "Waiting for PostgreSQL..."
+              sleep 5
+            done
+
+            # Enable pgcrypto extension for encryption functions
+            echo "Enabling pgcrypto extension..."
+            psql -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;" || echo "pgcrypto already enabled"
+
+            # Create encrypted audit_log table with hash chain
+            echo "Creating encrypted audit_log table..."
+            psql <<'EOF'
+            CREATE TABLE IF NOT EXISTS audit_log_encrypted (
+              id BIGSERIAL PRIMARY KEY,
+              encrypted_event BYTEA NOT NULL,
+              event_hash VARCHAR(64) NOT NULL,
+              previous_hash VARCHAR(64),
+              event_type VARCHAR(50) NOT NULL,
+              entity_id VARCHAR(255),
+              actor_id VARCHAR(255) NOT NULL,
+              timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+              CONSTRAINT valid_hash CHECK (length(event_hash) = 64),
+              CONSTRAINT valid_previous_hash CHECK (previous_hash IS NULL OR length(previous_hash) = 64)
+            );
+
+            -- Index for performance
+            CREATE INDEX IF NOT EXISTS idx_audit_encrypted_timestamp ON audit_log_encrypted(timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_encrypted_entity ON audit_log_encrypted(entity_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_encrypted_actor ON audit_log_encrypted(actor_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_encrypted_type ON audit_log_encrypted(event_type);
+            CREATE INDEX IF NOT EXISTS idx_audit_encrypted_hash ON audit_log_encrypted(event_hash);
+
+            -- Table for audit integrity verification
+            CREATE TABLE IF NOT EXISTS audit_integrity_check (
+              id BIGSERIAL PRIMARY KEY,
+              check_timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+              total_events BIGINT NOT NULL,
+              chain_valid BOOLEAN NOT NULL,
+              broken_chain_at BIGINT,
+              details JSONB
+            );
+
+            -- Function to verify audit chain integrity
+            CREATE OR REPLACE FUNCTION verify_audit_chain()
+            RETURNS TABLE(is_valid BOOLEAN, broken_at BIGINT, total_checked BIGINT) AS $$
+            DECLARE
+              prev_hash VARCHAR(64);
+              current_id BIGINT;
+              current_prev_hash VARCHAR(64);
+              broken_id BIGINT;
+              count_checked BIGINT := 0;
+            BEGIN
+              broken_id := NULL;
+
+              -- Iterate through audit log in order
+              FOR current_id, current_prev_hash IN
+                SELECT id, previous_hash FROM audit_log_encrypted ORDER BY id
+              LOOP
+                count_checked := count_checked + 1;
+
+                -- First event should have NULL previous_hash
+                IF count_checked = 1 THEN
+                  IF current_prev_hash IS NOT NULL THEN
+                    broken_id := current_id;
+                    EXIT;
+                  END IF;
+                -- All other events should match previous hash
+                ELSIF current_prev_hash IS NULL OR current_prev_hash != prev_hash THEN
+                  broken_id := current_id;
+                  EXIT;
+                END IF;
+
+                -- Get current event hash for next iteration
+                SELECT event_hash INTO prev_hash FROM audit_log_encrypted WHERE id = current_id;
+              END LOOP;
+
+              RETURN QUERY SELECT (broken_id IS NULL), broken_id, count_checked;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            COMMENT ON TABLE audit_log_encrypted IS 'Encrypted audit events with hash chain for tamper detection';
+            COMMENT ON COLUMN audit_log_encrypted.encrypted_event IS 'Event data encrypted with Vault Transit';
+            COMMENT ON COLUMN audit_log_encrypted.event_hash IS 'SHA-256 hash of plaintext event';
+            COMMENT ON COLUMN audit_log_encrypted.previous_hash IS 'Hash of previous event (chain link)';
+            EOF
+
+            echo "Creating sensitive data encryption table..."
+            psql <<'EOF'
+            -- Table for storing encrypted sensitive data (PII, credentials, etc.)
+            CREATE TABLE IF NOT EXISTS encrypted_data (
+              id BIGSERIAL PRIMARY KEY,
+              data_type VARCHAR(50) NOT NULL,
+              entity_id VARCHAR(255) NOT NULL,
+              field_name VARCHAR(100) NOT NULL,
+              encrypted_value BYTEA NOT NULL,
+              encryption_key_version INTEGER NOT NULL DEFAULT 1,
+              created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+              updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL,
+              UNIQUE(data_type, entity_id, field_name)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_encrypted_data_lookup ON encrypted_data(data_type, entity_id, field_name);
+
+            COMMENT ON TABLE encrypted_data IS 'Encrypted sensitive data fields (PII, credentials)';
+            COMMENT ON COLUMN encrypted_data.encrypted_value IS 'Data encrypted with Vault Transit';
+            COMMENT ON COLUMN encrypted_data.encryption_key_version IS 'Vault key version for rotation support';
+            EOF
+
+            # Create trigger for updated_at
+            psql <<'EOF'
+            CREATE OR REPLACE FUNCTION update_updated_at_column()
+            RETURNS TRIGGER AS $$
+            BEGIN
+              NEW.updated_at = CURRENT_TIMESTAMP;
+              RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            DROP TRIGGER IF EXISTS update_encrypted_data_updated_at ON encrypted_data;
+            CREATE TRIGGER update_encrypted_data_updated_at
+              BEFORE UPDATE ON encrypted_data
+              FOR EACH ROW
+              EXECUTE FUNCTION update_updated_at_column();
+            EOF
+
+            echo "=== PostgreSQL encryption initialization completed successfully ==="
+{{- end }}

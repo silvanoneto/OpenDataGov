@@ -1,0 +1,438 @@
+{{- if .Values.networkPolicies.enabled }}
+---
+# Governance Engine NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-governance-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: governance-engine
+spec:
+  podSelector:
+    matchLabels:
+      app: governance-engine
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow Gateway HTTP API calls
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 8000  # HTTP API
+
+    # Allow gRPC calls from other services
+    - from:
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+        - podSelector:
+            matchLabels:
+              app: quality-gate
+        - podSelector:
+            matchLabels:
+              app: data-expert
+      ports:
+        - protocol: TCP
+          port: 50051  # gRPC
+
+    # Allow from Istio ingress
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 8000
+        - protocol: TCP
+          port: 50051
+
+  egress:
+    # Allow PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # Allow Kafka
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092  # Kafka broker
+
+    # Allow Keycloak (auth)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow OPA (policy checks)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opa
+      ports:
+        - protocol: TCP
+          port: 8181
+
+    # Allow Vault (secrets)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+      ports:
+        - protocol: TCP
+          port: 8200
+
+    # Allow calls to Lakehouse Agent
+    - to:
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+      ports:
+        - protocol: TCP
+          port: 8001
+
+---
+# Lakehouse Agent NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-lakehouse-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lakehouse-agent
+spec:
+  podSelector:
+    matchLabels:
+      app: lakehouse-agent
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Governance Engine
+    - from:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 8001
+
+    # Allow from Gateway
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 8001
+
+    # Allow from Data Expert
+    - from:
+        - podSelector:
+            matchLabels:
+              app: data-expert
+      ports:
+        - protocol: TCP
+          port: 8001
+
+  egress:
+    # Allow Trino (query engine)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: trino
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow MinIO (object storage)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+
+    # Allow Iceberg REST catalog
+    - to:
+        - podSelector:
+            matchLabels:
+              app: iceberg-rest
+      ports:
+        - protocol: TCP
+          port: 8181
+
+    # Allow calls to Governance Engine gRPC
+    - to:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 50051
+
+    # Allow Vault
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+      ports:
+        - protocol: TCP
+          port: 8200
+
+---
+# Quality Gate NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-quality-gate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: quality-gate
+spec:
+  podSelector:
+    matchLabels:
+      app: quality-gate
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Governance Engine (trigger checks)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 8002
+
+    # Allow from Lakehouse Agent
+    - from:
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+      ports:
+        - protocol: TCP
+          port: 8002
+
+    # Allow from Gateway (query results)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 8002
+
+  egress:
+    # Allow PostgreSQL (read quality metadata)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # Allow Kafka (publish quality events)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kafka
+      ports:
+        - protocol: TCP
+          port: 9092
+
+    # Allow Governance Engine gRPC
+    - to:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 50051
+
+---
+# Data Expert (AI Agent) NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-data-expert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data-expert
+spec:
+  podSelector:
+    matchLabels:
+      app: data-expert
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Gateway (user interactions)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 8003
+
+    # Allow from Governance Engine
+    - from:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 8003
+
+  egress:
+    # Allow Governance Engine HTTP API
+    - to:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 8000
+
+    # Allow Lakehouse Agent (data queries)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+      ports:
+        - protocol: TCP
+          port: 8001
+
+    # Allow Qdrant (vector DB for RAG)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: qdrant
+      ports:
+        - protocol: TCP
+          port: 6333  # HTTP API
+        - protocol: TCP
+          port: 6334  # gRPC
+
+    # Allow external AI API (if configured)
+    {{- if .Values.dataExpert.allowExternalAI }}
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS for external APIs
+    {{- end }}
+
+---
+# Gateway NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from Istio Ingress Gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+        - podSelector:
+            matchLabels:
+              app: istio-ingressgateway
+      ports:
+        - protocol: TCP
+          port: 8080
+
+    # Allow from within namespace (testing)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+
+  egress:
+    # Allow all backend services
+    - to:
+        - podSelector:
+            matchLabels:
+              app: governance-engine
+      ports:
+        - protocol: TCP
+          port: 8000
+
+    - to:
+        - podSelector:
+            matchLabels:
+              app: lakehouse-agent
+      ports:
+        - protocol: TCP
+          port: 8001
+
+    - to:
+        - podSelector:
+            matchLabels:
+              app: quality-gate
+      ports:
+        - protocol: TCP
+          port: 8002
+
+    - to:
+        - podSelector:
+            matchLabels:
+              app: data-expert
+      ports:
+        - protocol: TCP
+          port: 8003
+
+    # Allow Keycloak (auth)
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+
+{{- end }}

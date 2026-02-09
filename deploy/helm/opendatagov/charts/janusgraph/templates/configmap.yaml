@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "janusgraph.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "janusgraph.labels" . | nindent 4 }}
+data:
+  janusgraph.properties: |
+    # JanusGraph Configuration for Data Lineage
+
+    # Storage backend (Cassandra)
+    storage.backend={{ .Values.properties.storage.backend }}
+    storage.hostname={{ .Release.Name }}-{{ .Values.properties.storage.hostname }}
+    storage.port={{ .Values.properties.storage.port }}
+    storage.cql.keyspace={{ .Values.properties.storage.cql.keyspace }}
+    storage.cql.replication-factor={{ index .Values.properties.storage.cql "replication-factor" }}
+    storage.cql.replication-strategy-class={{ index .Values.properties.storage.cql "replication-strategy-class" }}
+
+    # Index backend
+    index.search.backend={{ .Values.properties.index.search.backend }}
+    {{- if eq .Values.properties.index.search.backend "lucene" }}
+    index.search.directory={{ .Values.properties.index.search.directory }}
+    {{- end }}
+
+    # Cache configuration
+    cache.db-cache={{ index .Values.properties.cache "db-cache" }}
+    cache.db-cache-clean-wait={{ index .Values.properties.cache "db-cache-clean-wait" }}
+    cache.db-cache-time={{ index .Values.properties.cache "db-cache-time" }}
+    cache.db-cache-size={{ index .Values.properties.cache "db-cache-size" }}
+
+    # Query configuration
+    query.batch=true
+    query.force-index=false
+
+    # Schema configuration
+    schema.default=none

@@ -1,0 +1,213 @@
+{{- if .Values.vault.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-vault-init
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "opendatagov.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: vault-init
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ include "opendatagov.fullname" . }}-vault-init
+      containers:
+      - name: vault-init
+        image: hashicorp/vault:1.15
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: VAULT_ADDR
+            value: "http://{{ include "opendatagov.fullname" . }}-vault:8200"
+          {{- if .Values.vault.server.dev.enabled }}
+          - name: VAULT_TOKEN
+            value: {{ .Values.vault.server.dev.devRootToken | default "root" | quote }}
+          {{- end }}
+          - name: POSTGRES_HOST
+            value: "{{ include "opendatagov.fullname" . }}-postgresql"
+          - name: POSTGRES_PORT
+            value: "5432"
+          - name: POSTGRES_USER
+            value: {{ .Values.postgresql.auth.username | default "odg" | quote }}
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "opendatagov.fullname" . }}-postgresql
+                key: password
+          - name: POSTGRES_DB
+            value: {{ .Values.postgresql.auth.database | default "odg" | quote }}
+        command:
+          - /bin/sh
+          - -c
+          - |
+            set -e
+            echo "=== Vault Initialization Job ==="
+
+            # Wait for Vault to be ready
+            echo "Waiting for Vault to be ready..."
+            until vault status 2>/dev/null; do
+              echo "Vault not ready yet, waiting..."
+              sleep 5
+            done
+            echo "Vault is ready!"
+
+            # ─── Enable KV v2 Secrets Engine ───────────────────────────
+            echo "Enabling KV v2 secrets engine..."
+            vault secrets enable -path=secret kv-v2 2>/dev/null || echo "  KV v2 already enabled"
+
+            # Store static secrets (for services that don't support dynamic)
+            echo "Storing static secrets..."
+            vault kv put secret/odg/postgresql \
+              host="${POSTGRES_HOST}" \
+              port="${POSTGRES_PORT}" \
+              database="${POSTGRES_DB}" \
+              username="${POSTGRES_USER}" \
+              password="${POSTGRES_PASSWORD}" || echo "  Secrets already exist"
+
+            # ─── Enable Transit Engine for Encryption ──────────────────
+            echo "Enabling Transit engine for encryption..."
+            vault secrets enable transit 2>/dev/null || echo "  Transit already enabled"
+
+            # Create encryption key for audit logs
+            echo "Creating encryption key: odg-encryption..."
+            vault write -f transit/keys/odg-encryption 2>/dev/null || echo "  Key already exists"
+
+            # Create encryption key for MinIO SSE
+            echo "Creating encryption key: odg-minio-sse..."
+            vault write -f transit/keys/odg-minio-sse 2>/dev/null || echo "  Key already exists"
+
+            # ─── Enable Database Secrets Engine ────────────────────────
+            echo "Enabling Database secrets engine..."
+            vault secrets enable database 2>/dev/null || echo "  Database engine already enabled"
+
+            # Configure PostgreSQL dynamic secrets
+            echo "Configuring PostgreSQL dynamic secrets..."
+            vault write database/config/postgresql \
+              plugin_name=postgresql-database-plugin \
+              allowed_roles="odg-app,odg-readonly" \
+              connection_url="postgresql://{{`{{username}}`}}:{{`{{password}}`}}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" \
+              username="${POSTGRES_USER}" \
+              password="${POSTGRES_PASSWORD}" || echo "  PostgreSQL config already exists"
+
+            # Create role for application (read-write)
+            echo "Creating Vault role: odg-app (read-write)..."
+            vault write database/roles/odg-app \
+              db_name=postgresql \
+              creation_statements="CREATE ROLE \"{{`{{name}}`}}\" WITH LOGIN PASSWORD '{{`{{password}}`}}' VALID UNTIL '{{`{{expiration}}`}}' IN ROLE odg; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"{{`{{name}}`}}\"; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"{{`{{name}}`}}\";" \
+              default_ttl="1h" \
+              max_ttl="24h" || echo "  Role already exists"
+
+            # Create role for read-only access
+            echo "Creating Vault role: odg-readonly..."
+            vault write database/roles/odg-readonly \
+              db_name=postgresql \
+              creation_statements="CREATE ROLE \"{{`{{name}}`}}\" WITH LOGIN PASSWORD '{{`{{password}}`}}' VALID UNTIL '{{`{{expiration}}`}}'; GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{`{{name}}`}}\";" \
+              default_ttl="1h" \
+              max_ttl="24h" || echo "  Role already exists"
+
+            # ─── Create Vault Policies ─────────────────────────────────
+            echo "Creating Vault policies..."
+
+            # Policy for application access
+            vault policy write odg-app - <<EOF
+            # Read KV secrets
+            path "secret/data/odg/*" {
+              capabilities = ["read"]
+            }
+
+            # Transit encryption/decryption
+            path "transit/encrypt/odg-encryption" {
+              capabilities = ["update"]
+            }
+
+            path "transit/decrypt/odg-encryption" {
+              capabilities = ["update"]
+            }
+
+            path "transit/encrypt/odg-minio-sse" {
+              capabilities = ["update"]
+            }
+
+            path "transit/decrypt/odg-minio-sse" {
+              capabilities = ["update"]
+            }
+
+            # Dynamic database credentials
+            path "database/creds/odg-app" {
+              capabilities = ["read"]
+            }
+
+            # Renew leases
+            path "sys/leases/renew" {
+              capabilities = ["update"]
+            }
+            EOF
+
+            # Policy for read-only access
+            vault policy write odg-readonly - <<EOF
+            # Read KV secrets
+            path "secret/data/odg/*" {
+              capabilities = ["read"]
+            }
+
+            # Read-only database credentials
+            path "database/creds/odg-readonly" {
+              capabilities = ["read"]
+            }
+            EOF
+
+            # ─── Enable Kubernetes Auth ────────────────────────────────
+            echo "Enabling Kubernetes auth..."
+            vault auth enable kubernetes 2>/dev/null || echo "  Kubernetes auth already enabled"
+
+            # Configure Kubernetes auth
+            echo "Configuring Kubernetes auth..."
+            vault write auth/kubernetes/config \
+              kubernetes_host="https://kubernetes.default.svc:443" || echo "  Kubernetes auth already configured"
+
+            # Create Kubernetes auth role for governance-engine
+            echo "Creating Kubernetes auth role: governance-engine..."
+            vault write auth/kubernetes/role/governance-engine \
+              bound_service_account_names=governance-engine \
+              bound_service_account_namespaces={{ .Release.Namespace }} \
+              policies=odg-app \
+              ttl=1h || echo "  Role already exists"
+
+            # Create Kubernetes auth role for lakehouse-agent
+            echo "Creating Kubernetes auth role: lakehouse-agent..."
+            vault write auth/kubernetes/role/lakehouse-agent \
+              bound_service_account_names=lakehouse-agent \
+              bound_service_account_namespaces={{ .Release.Namespace }} \
+              policies=odg-app \
+              ttl=1h || echo "  Role already exists"
+
+            # Create Kubernetes auth role for quality-gate
+            echo "Creating Kubernetes auth role: quality-gate..."
+            vault write auth/kubernetes/role/quality-gate \
+              bound_service_account_names=quality-gate \
+              bound_service_account_namespaces={{ .Release.Namespace }} \
+              policies=odg-readonly \
+              ttl=1h || echo "  Role already exists"
+
+            echo "=== Vault initialization completed successfully ==="
+---
+# ServiceAccount for Vault init job
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-vault-init
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation
+{{- end }}

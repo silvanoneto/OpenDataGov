@@ -1,0 +1,187 @@
+# Model Card: NLP Expert
+# EU AI Act Compliance Document
+# Risk Level: LIMITED (Article 52 - Transparency obligations)
+
+model_details:
+  name: nlp-expert
+  version: 0.1.0
+  model_type: Natural Language Processing and Understanding
+  model_backend:
+    - Base Model: BERT (bert-base-uncased)
+    - Parameters: 110M
+    - Architecture: Transformer (12 layers, 768 hidden, 12 heads)
+    - Additional: PII detection (regex-based)
+  deployment_date: "2026-02-08"
+  developer: OpenDataGov Team
+  contact: governance@opendatagov.org
+
+intended_use:
+  primary_use_cases:
+    - Text classification into categories
+    - Named entity recognition (NER) with PII detection
+    - Sentiment analysis
+    - Text summarization
+    - Question answering based on context
+  target_users:
+    - Data Stewards (data quality, PII detection)
+    - Data Scientists (text preprocessing)
+    - Compliance Officers (GDPR/LGPD compliance)
+    - Data Protection Officers
+  out_of_scope:
+    - Automated decision-making without human review
+    - PII processing without proper consent
+    - Legal document interpretation (requires lawyer)
+    - Medical text analysis (requires medical expert)
+
+capabilities:
+  - name: text_classification
+    description: Classify text into categories
+    requires_approval: true  # If PII detected
+  - name: named_entity_recognition
+    description: Extract entities with PII detection
+    requires_approval: true  # Always (GDPR compliance)
+  - name: sentiment_analysis
+    description: Analyze sentiment
+    requires_approval: false  # Read-only analysis
+  - name: text_summarization
+    description: Summarize documents
+    requires_approval: true  # If PII in source
+  - name: question_answering
+    description: Answer questions from context
+    requires_approval: true  # Human verification
+
+training_data:
+  bert_base:
+    dataset: BookCorpus + English Wikipedia
+    size: 3.3B words (16GB text)
+    language: English
+    collection_period: Before 2019
+    license: Apache 2.0
+  pii_patterns:
+    source: Manually curated regex patterns
+    coverage: Email, phone, SSN, credit card, IP address
+
+performance_metrics:
+  text_classification:
+    glue_avg: "79.6% (GLUE benchmark)"
+    mnli: "84.6%"
+  named_entity_recognition:
+    conll2003_f1: "92.4%"
+  pii_detection:
+    precision: "90%+ (regex-based)"
+    recall: "85%+ (regex-based)"
+    f1_score: "87-88%"
+  question_answering:
+    squad_v2_f1: "76.5%"
+
+limitations:
+  - English-only (no multilingual support)
+  - PII detection limited to common patterns (regex)
+  - May miss context-dependent PII (names without clear markers)
+  - Cannot detect indirect identifiers (quasi-identifiers)
+  - Sentiment analysis may miss sarcasm/irony
+  - Summarization may lose important details
+  - Requires fine-tuning for domain-specific tasks
+
+ethical_considerations:
+  bias:
+    - Training data (Wikipedia, books) contains societal biases
+    - May exhibit gender, racial, and cultural biases
+    - Sentiment analysis may be biased for minority dialects
+  fairness:
+    - Equal error rates not guaranteed across demographics
+    - PII detection accuracy may vary by region/format
+  privacy:
+    - CRITICAL: PII detection for GDPR/LGPD compliance
+    - Automatic flagging of PII-containing text
+    - Requires approval workflow for PII processing
+    - Audit logs for all PII-related operations
+  transparency:
+    - Confidence scores provided
+    - PII entities explicitly listed
+    - Source context provided for QA
+
+risk_assessment:
+  eu_ai_act:
+    risk_level: LIMITED
+    article: Article 52 (Transparency obligations)
+    justification: >
+      AI system for text analysis with PII detection.
+      Supports GDPR/LGPD compliance through automatic PII flagging.
+      Requires human oversight for PII processing.
+
+  privacy_risks:
+    - PII exposure: NER may extract sensitive information
+    - Data leakage: Summarization may include PII
+    - Re-identification: Combination of entities may identify individuals
+
+  mitigation_measures:
+    - Automatic PII detection (email, phone, SSN, credit card, IP)
+    - Mandatory approval for PII-containing text
+    - Audit trail: All PII detections logged to Kafka
+    - Human review: Data Steward verifies PII handling
+    - Redaction: Option to redact PII from output
+    - Consent check: Verify consent before processing PII
+
+governance:
+  raci:
+    responsible: Data Scientist (model deployment, monitoring)
+    accountable: Data Protection Officer (PII handling approval)
+    consulted: Legal Team (GDPR compliance)
+    informed: Data Steward (monitoring)
+
+  approval_workflow:
+    registration: Requires Data Architect + DPO approval
+    pii_processing: Requires explicit consent + approval
+    deployment: Requires governance decision (ADR-011)
+
+  monitoring:
+    - OpenTelemetry traces for all requests
+    - Prometheus metrics (latency, PII detection rate)
+    - Grafana dashboards (PII trends, usage patterns)
+    - Kafka audit logs (PII detections, approvals)
+
+human_oversight:
+  mechanism: "AI detects, human decides"
+  implementation:
+    - "PII detected: Automatic requires_approval: true"
+    - NER results: Always flagged for review
+    - Summarization: Review if PII in source
+    - QA: Always requires verification
+  escalation:
+    - PII detected: Escalate to Data Protection Officer
+    - High PII count: Automatic security review
+    - Sensitive content: Flag for manual review
+
+compliance:
+  regulations:
+    - EU AI Act: LIMITED risk (Article 52)
+    - GDPR: Article 6 (lawful basis), Article 22 (automated decisions)
+    - LGPD: Similar to GDPR requirements
+    - EU Data Protection Directive
+
+  privacy_features:
+    - Automatic PII detection (5 patterns)
+    - GDPR-compliant audit logging
+    - Approval workflow for PII processing
+    - Optional PII redaction
+    - Consent verification
+
+  pii_patterns:
+    - Email addresses
+    - Phone numbers (US format)
+    - Social Security Numbers (US format)
+    - Credit card numbers
+    - IP addresses
+
+  model_card_version: 1.0
+  last_updated: "2026-02-08"
+  next_review: "2026-08-08"  # 6 months
+
+warnings:
+  - CRITICAL: Always verify PII detection results
+  - Do NOT process PII without proper consent
+  - Do NOT store PII in logs without anonymization
+  - Review all NER outputs for PII before sharing
+  - Monitor for false positives/negatives in PII detection
+  - Upgrade to advanced NER models for production (spaCy, Stanza)

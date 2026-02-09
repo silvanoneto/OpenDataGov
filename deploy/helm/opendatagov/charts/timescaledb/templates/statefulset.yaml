@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "timescaledb.fullname" . }}
+  labels:
+    {{- include "timescaledb.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "timescaledb.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "timescaledb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "timescaledb.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: timescaledb
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: postgresql
+          containerPort: 5432
+          protocol: TCP
+        env:
+        - name: POSTGRES_DB
+          value: {{ .Values.auth.database | quote }}
+        - name: POSTGRES_USER
+          value: {{ .Values.auth.username | quote }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "timescaledb.fullname" . }}
+              key: password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        # TimescaleDB tuning
+        - name: TS_TUNE_MAX_CONNS
+          value: {{ .Values.config.maxConnections | quote }}
+        - name: TS_TUNE_MEMORY
+          value: {{ .Values.resources.requests.memory | quote }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U {{ .Values.auth.username }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U {{ .Values.auth.username }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        {{- if not .Values.persistence.enabled }}
+        - name: run
+          mountPath: /var/run/postgresql
+        {{- end }}
+      volumes:
+      {{- if not .Values.persistence.enabled }}
+      - name: data
+        emptyDir: {}
+      - name: run
+        emptyDir: {}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      {{- if .Values.persistence.storageClass }}
+      storageClassName: {{ .Values.persistence.storageClass | quote }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size | quote }}
+  {{- end }}

@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "federation-service.fullname" . }}
+  labels:
+    {{- include "federation-service.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "federation-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "federation-service.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "federation-service.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: federation-service
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: grpc
+              containerPort: 50060
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          env:
+            # Instance Configuration
+            - name: INSTANCE_ID
+              value: {{ .Values.instance.id | quote }}
+            - name: INSTANCE_NAME
+              value: {{ .Values.instance.name | quote }}
+            - name: REGION
+              value: {{ .Values.instance.region | quote }}
+            - name: ORGANIZATION
+              value: {{ .Values.instance.organization | quote }}
+            - name: GRAPHQL_ENDPOINT
+              value: {{ .Values.federation.graphqlEndpoint | quote }}
+            - name: GRPC_ENDPOINT
+              value: {{ .Values.federation.grpcEndpoint | quote }}
+
+            # Database Configuration
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.passwordSecret.name }}
+                  key: connection-string
+                  optional: false
+
+            # TLS Configuration
+            {{- if .Values.tls.enabled }}
+            - name: TLS_CERT_FILE
+              value: "/certs/tls.crt"
+            - name: TLS_KEY_FILE
+              value: "/certs/tls.key"
+            - name: CA_CERT_FILE
+              value: "/certs/ca.crt"
+            {{- end }}
+
+            # Logging
+            - name: LOG_LEVEL
+              value: {{ .Values.logging.level | quote }}
+            - name: LOG_FORMAT
+              value: {{ .Values.logging.format | quote }}
+
+            # Security
+            - name: OPA_ENDPOINT
+              value: {{ .Values.security.opaEndpoint | quote }}
+
+          volumeMounts:
+            {{- if .Values.tls.enabled }}
+            - name: tls-certs
+              mountPath: /certs
+              readOnly: true
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+      volumes:
+        {{- if .Values.tls.enabled }}
+        - name: tls-certs
+          secret:
+            secretName: {{ include "federation-service.fullname" . }}-tls
+            defaultMode: 0400
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,190 @@
+# Default values for feast chart
+
+# Global settings
+global:
+  profile: dev
+
+# Feast Registry Service
+registry:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: feastdev/feature-server
+    tag: "0.36.0"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 6566
+    targetPort: 6566
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+
+  # Registry backend (SQL or file-based)
+  backend:
+    type: postgresql  # postgresql, sqlite, or file
+    postgresql:
+      host: ""  # Auto-configured to shared PostgreSQL
+      port: 5432
+      database: feast
+      existingSecret: ""
+
+    # File-based registry (dev only)
+    file:
+      path: /feast/registry.db
+
+# Feature Server (online serving)
+featureServer:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: feastdev/feature-server
+    tag: "0.36.0"
+
+  service:
+    type: ClusterIP
+    port: 6566
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# Online Store (Redis)
+onlineStore:
+  enabled: true
+  type: redis
+  redis:
+    host: ""  # Auto-configured
+    port: 6379
+    database: 0
+    ssl: false
+
+# Offline Store (S3/MinIO + Parquet)
+offlineStore:
+  enabled: true
+  type: file  # file, bigquery, snowflake, redshift
+
+  # S3/MinIO configuration
+  s3:
+    endpoint: ""  # Auto-configured to MinIO
+    bucket: feast-offline
+    region: us-east-1
+    existingSecret: ""
+
+# Feature materialization job
+materialization:
+  enabled: true
+
+  # Schedule for materializing features from offline to online store
+  schedule: "0 */6 * * *"  # Every 6 hours
+
+  # Job resources
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# Quality gates for features
+qualityGates:
+  enabled: false  # Disabled in dev
+
+  # Feature freshness SLA
+  freshness:
+    enabled: true
+    maxStalenessHours: 24
+    alertOnViolation: true
+
+  # Feature completeness
+  completeness:
+    enabled: true
+    minCompleteness: 0.95
+    alertOnViolation: true
+
+# Governance integration
+governance:
+  enabled: false  # Disabled in dev
+  governanceEngineUrl: "http://governance-engine:8000"
+  requireApprovalForNewFeatures: false
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+
+  # Metrics
+  metrics:
+    enabled: true
+    port: 8000
+
+# Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Pod Security Context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+
+# Redis subchart configuration
+redis:
+  enabled: true
+  auth:
+    enabled: false  # Simplified for dev
+  master:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Extra environment variables
+extraEnv: []

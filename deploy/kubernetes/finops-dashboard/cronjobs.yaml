@@ -1,0 +1,249 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-cost-collection
+  namespace: odg-platform
+  labels:
+    app: finops-dashboard
+    component: cost-collector
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: finops-dashboard
+            job: cost-collection
+        spec:
+          serviceAccountName: finops-dashboard
+          restartPolicy: OnFailure
+          containers:
+            - name: cost-collector
+              image: odg/finops-dashboard:1.0.0
+              command:
+                - python
+                - -c
+                - |
+                  import asyncio
+                  import httpx
+                  from datetime import datetime, timedelta
+
+                  async def collect_costs():
+                      async with httpx.AsyncClient() as client:
+                          today = datetime.now().date()
+                          yesterday = (datetime.now() - timedelta(days=1)).date()
+
+                          # Trigger collection for yesterday
+                          response = await client.post(
+                              "http://finops-dashboard:8080/api/v1/finops/costs/collect/all",
+                              params={
+                                  "start_date": yesterday.isoformat(),
+                                  "end_date": today.isoformat()
+                              }
+                          )
+
+                          print(f"Cost collection status: {response.status_code}")
+                          print(response.json())
+
+                  asyncio.run(collect_costs())
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: finops-dashboard-secrets
+                      key: database-url
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 512Mi
+                limits:
+                  cpu: 1000m
+                  memory: 2Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-budget-check
+  namespace: odg-platform
+  labels:
+    app: finops-dashboard
+    component: budget-monitor
+spec:
+  schedule: "0 * * * *"  # Every hour
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: finops-dashboard
+            job: budget-check
+        spec:
+          serviceAccountName: finops-dashboard
+          restartPolicy: OnFailure
+          containers:
+            - name: budget-checker
+              image: odg/finops-dashboard:1.0.0
+              command:
+                - python
+                - -c
+                - |
+                  import asyncio
+                  import httpx
+
+                  async def check_budgets():
+                      async with httpx.AsyncClient() as client:
+                          response = await client.post(
+                              "http://finops-dashboard:8080/api/v1/finops/budgets/check-all"
+                          )
+
+                          print(f"Budget check status: {response.status_code}")
+                          print(response.json())
+
+                  asyncio.run(check_budgets())
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: finops-dashboard-secrets
+                      key: database-url
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 1Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-anomaly-detection
+  namespace: odg-platform
+  labels:
+    app: finops-dashboard
+    component: anomaly-detector
+spec:
+  schedule: "0 2 * * *"  # Daily at 2am
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: finops-dashboard
+            job: anomaly-detection
+        spec:
+          serviceAccountName: finops-dashboard
+          restartPolicy: OnFailure
+          containers:
+            - name: anomaly-detector
+              image: odg/finops-dashboard:1.0.0
+              command:
+                - python
+                - -c
+                - |
+                  import asyncio
+                  import httpx
+
+                  async def detect_anomalies():
+                      async with httpx.AsyncClient(timeout=300.0) as client:
+                          response = await client.post(
+                              "http://finops-dashboard:8080/api/v1/finops/anomalies/detect",
+                              params={"lookback_days": 90}
+                          )
+
+                          print(f"Anomaly detection status: {response.status_code}")
+                          print(response.json())
+
+                  asyncio.run(detect_anomalies())
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: finops-dashboard-secrets
+                      key: database-url
+              resources:
+                requests:
+                  cpu: 1000m
+                  memory: 2Gi
+                limits:
+                  cpu: 4000m
+                  memory: 8Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-recommendations
+  namespace: odg-platform
+  labels:
+    app: finops-dashboard
+    component: savings-recommender
+spec:
+  schedule: "0 3 * * 0"  # Weekly on Sunday at 3am
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: finops-dashboard
+            job: recommendations
+        spec:
+          serviceAccountName: finops-dashboard
+          restartPolicy: OnFailure
+          containers:
+            - name: recommender
+              image: odg/finops-dashboard:1.0.0
+              command:
+                - python
+                - -c
+                - |
+                  import asyncio
+                  import httpx
+
+                  async def generate_recommendations():
+                      async with httpx.AsyncClient(timeout=600.0) as client:
+                          response = await client.post(
+                              "http://finops-dashboard:8080/api/v1/finops/recommendations/generate"
+                          )
+
+                          print(f"Recommendations status: {response.status_code}")
+                          print(response.json())
+
+                  asyncio.run(generate_recommendations())
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: finops-dashboard-secrets
+                      key: database-url
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-credentials
+                      key: access-key-id
+                      optional: true
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: aws-credentials
+                      key: secret-access-key
+                      optional: true
+              resources:
+                requests:
+                  cpu: 2000m
+                  memory: 4Gi
+                limits:
+                  cpu: 8000m
+                  memory: 16Gi

@@ -1,0 +1,331 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: support-portal-alerts
+  namespace: support-portal
+  labels:
+    app: support-portal
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: support-portal.availability
+      interval: 30s
+      rules:
+        - alert: SupportPortalDown
+          expr: up{job="support-portal"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            service: support-portal
+            team: engineering
+          annotations:
+            summary: "Support Portal service is down"
+            description: "Support Portal has been unreachable for more than 2 minutes. All customer requests are failing."
+            runbook_url: "https://docs.opendatagov.io/runbooks#service-down"
+            dashboard_url: "https://grafana.opendatagov.io/d/support-portal"
+
+        - alert: SupportPortalHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{job="support-portal",status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{job="support-portal"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            service: support-portal
+          annotations:
+            summary: "High error rate (>5%) on Support Portal"
+            description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+        - alert: SupportPortalHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{job="support-portal"}[5m])) by (le)
+            ) > 2
+          for: 10m
+          labels:
+            severity: warning
+            service: support-portal
+          annotations:
+            summary: "P95 latency > 2s on Support Portal"
+            description: "P95 response time is {{ $value | humanizeDuration }} (target: <1s)"
+
+    - name: support-portal.sla
+      interval: 1m
+      rules:
+        - alert: SLAComplianceBelow80Percent
+          expr: |
+            (
+              sum(sla_met_total{service="support-portal"})
+              /
+              sum(tickets_total{service="support-portal",status="resolved"})
+            ) < 0.80
+          for: 15m
+          labels:
+            severity: warning
+            service: support-portal
+            team: support
+          annotations:
+            summary: "SLA compliance below 80%"
+            description: "Current SLA compliance is {{ $value | humanizePercentage }}. Target: >95%"
+            action: "Review agent workload, check for understaffing"
+
+        - alert: SLABreachStorm
+          expr: sum(increase(sla_breached_total{service="support-portal"}[10m])) > 20
+          for: 5m
+          labels:
+            severity: critical
+            service: support-portal
+            team: support
+          annotations:
+            summary: "SLA breach storm: {{ $value }} breaches in 10 minutes"
+            description: "Abnormally high number of SLA breaches. Possible incident or understaffing."
+            runbook_url: "https://docs.opendatagov.io/runbooks#sla-breach-storm"
+
+        - alert: CriticalTicketUnassigned
+          expr: |
+            sum(tickets_total{service="support-portal",priority="P1_CRITICAL",status="NEW"}) > 0
+          for: 5m
+          labels:
+            severity: critical
+            service: support-portal
+            team: support
+          annotations:
+            summary: "{{ $value }} critical tickets unassigned for >5 minutes"
+            description: "P1 tickets must be assigned immediately"
+            action: "Assign to on-call engineer or escalate to manager"
+
+    - name: support-portal.database
+      interval: 30s
+      rules:
+        - alert: DatabaseConnectionPoolExhausted
+          expr: |
+            (
+              sum(pg_stat_activity_count{datname="support_portal",state="active"})
+              /
+              sum(pg_settings_max_connections)
+            ) > 0.90
+          for: 5m
+          labels:
+            severity: critical
+            service: support-portal
+            component: database
+          annotations:
+            summary: "PostgreSQL connection pool at {{ $value | humanizePercentage }}"
+            description: "Database connection pool is nearly exhausted. May cause request failures."
+            runbook_url: "https://docs.opendatagov.io/runbooks#database-connection-pool-exhausted"
+            action: "Increase pool size or kill idle connections"
+
+        - alert: DatabaseSlowQueries
+          expr: |
+            pg_stat_statements_mean_exec_time_seconds{datname="support_portal"} > 5
+          for: 10m
+          labels:
+            severity: warning
+            service: support-portal
+            component: database
+          annotations:
+            summary: "Slow queries detected (avg {{ $value | humanizeDuration }})"
+            description: "Query: {{ $labels.query }}"
+            action: "Review query plan, add indexes"
+
+        - alert: DatabaseDiskSpaceHigh
+          expr: |
+            (
+              pg_database_size_bytes{datname="support_portal"}
+              /
+              node_filesystem_size_bytes{mountpoint="/data"}
+            ) > 0.80
+          for: 30m
+          labels:
+            severity: warning
+            service: support-portal
+            component: database
+          annotations:
+            summary: "Database disk usage at {{ $value | humanizePercentage }}"
+            description: "Consider increasing disk size or archiving old data"
+
+    - name: support-portal.resources
+      interval: 30s
+      rules:
+        - alert: PodMemoryUsageHigh
+          expr: |
+            (
+              container_memory_working_set_bytes{namespace="support-portal",pod=~"support-portal-.*"}
+              /
+              container_spec_memory_limit_bytes{namespace="support-portal",pod=~"support-portal-.*"}
+            ) > 0.90
+          for: 10m
+          labels:
+            severity: warning
+            service: support-portal
+            component: pod
+          annotations:
+            summary: "Pod {{ $labels.pod }} memory usage at {{ $value | humanizePercentage }}"
+            description: "Risk of OOM kill. Consider increasing memory limit."
+            runbook_url: "https://docs.opendatagov.io/runbooks#high-memory-usage"
+
+        - alert: PodCPUThrottling
+          expr: |
+            rate(container_cpu_cfs_throttled_seconds_total{namespace="support-portal",pod=~"support-portal-.*"}[5m]) > 0.5
+          for: 15m
+          labels:
+            severity: warning
+            service: support-portal
+            component: pod
+          annotations:
+            summary: "Pod {{ $labels.pod }} CPU throttled {{ $value | humanizePercentage }}"
+            description: "Pod is being throttled. Consider increasing CPU limit."
+
+        - alert: PodRestartingFrequently
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="support-portal",pod=~"support-portal-.*"}[1h]) > 0.05
+          for: 10m
+          labels:
+            severity: warning
+            service: support-portal
+            component: pod
+          annotations:
+            summary: "Pod {{ $labels.pod }} restarted {{ $value }} times in 1 hour"
+            description: "Investigate pod logs for errors"
+            action: "kubectl logs {{ $labels.pod }} -n support-portal --previous"
+
+    - name: support-portal.integrations
+      interval: 1m
+      rules:
+        - alert: SendGridEmailDeliveryFailing
+          expr: |
+            (
+              sum(rate(sendgrid_email_sent_total{status="failed"}[5m]))
+              /
+              sum(rate(sendgrid_email_sent_total[5m]))
+            ) > 0.10
+          for: 10m
+          labels:
+            severity: warning
+            service: support-portal
+            component: sendgrid
+          annotations:
+            summary: "SendGrid email delivery failure rate: {{ $value | humanizePercentage }}"
+            description: "Check SendGrid status page and API key validity"
+            runbook_url: "https://docs.opendatagov.io/runbooks#external-integration-failure"
+
+        - alert: PagerDutyIntegrationDown
+          expr: pagerduty_integration_healthy == 0
+          for: 5m
+          labels:
+            severity: critical
+            service: support-portal
+            component: pagerduty
+          annotations:
+            summary: "PagerDuty integration is down"
+            description: "Critical tickets will not page on-call engineers"
+            action: "Verify integration key and PagerDuty API status"
+
+        - alert: ElasticsearchClusterUnhealthy
+          expr: elasticsearch_cluster_health_status{color!="green"} > 0
+          for: 10m
+          labels:
+            severity: warning
+            service: support-portal
+            component: elasticsearch
+          annotations:
+            summary: "Elasticsearch cluster status: {{ $labels.color }}"
+            description: "KB search may be degraded or unavailable"
+            runbook_url: "https://docs.opendatagov.io/runbooks#elasticsearch-index-corruption"
+
+    - name: support-portal.business-metrics
+      interval: 5m
+      rules:
+        - alert: TicketVolumeSpike
+          expr: |
+            (
+              sum(rate(tickets_created_total{service="support-portal"}[15m]))
+              /
+              sum(rate(tickets_created_total{service="support-portal"}[1h] offset 1d))
+            ) > 3
+          for: 15m
+          labels:
+            severity: warning
+            service: support-portal
+            team: support
+          annotations:
+            summary: "Ticket volume 3x higher than normal"
+            description: "Current rate: {{ $value }}x baseline. Possible incident or spam attack."
+            action: "Check for duplicate issues, consider proactive customer communication"
+
+        - alert: CSATScoreLow
+          expr: |
+            (
+              sum(csat_rating_total{service="support-portal",rating=~"[45]"})
+              /
+              sum(csat_rating_total{service="support-portal"})
+            ) < 0.70
+          for: 6h
+          labels:
+            severity: info
+            service: support-portal
+            team: support
+          annotations:
+            summary: "CSAT satisfaction rate below 70% (last 6 hours)"
+            description: "Current satisfaction: {{ $value | humanizePercentage }}. Target: >80%"
+            action: "Review recent ticket resolutions, identify training opportunities"
+
+        - alert: KnowledgeBaseSearchFailureHigh
+          expr: |
+            (
+              sum(rate(kb_search_results_zero_total{service="support-portal"}[1h]))
+              /
+              sum(rate(kb_search_total{service="support-portal"}[1h]))
+            ) > 0.30
+          for: 30m
+          labels:
+            severity: info
+            service: support-portal
+            team: support
+          annotations:
+            summary: "{{ $value | humanizePercentage }} of KB searches return 0 results"
+            description: "KB may need more articles or better indexing"
+            action: "Review top search queries, create missing articles"
+
+    - name: support-portal.security
+      interval: 1m
+      rules:
+        - alert: RateLimitExceededFrequently
+          expr: sum(increase(http_requests_rate_limited_total{service="support-portal"}[5m])) > 100
+          for: 5m
+          labels:
+            severity: warning
+            service: support-portal
+            team: security
+          annotations:
+            summary: "{{ $value }} requests rate limited in 5 minutes"
+            description: "Possible abuse or DDoS attack"
+            runbook_url: "https://docs.opendatagov.io/runbooks#sudden-traffic-spike"
+
+        - alert: SuspiciousActivityDetected
+          expr: sum(increase(auth_failed_total{service="support-portal"}[5m])) by (ip_address) > 50
+          for: 2m
+          labels:
+            severity: warning
+            service: support-portal
+            team: security
+          annotations:
+            summary: "{{ $value }} failed auth attempts from {{ $labels.ip_address }}"
+            description: "Possible brute force attack"
+            action: "Block IP address: {{ $labels.ip_address }}"
+
+        - alert: TLSCertificateExpiringSoon
+          expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < 7
+          for: 1h
+          labels:
+            severity: warning
+            service: support-portal
+            team: infrastructure
+          annotations:
+            summary: "TLS certificate expires in {{ $value }} days"
+            description: "Domain: {{ $labels.instance }}"
+            runbook_url: "https://docs.opendatagov.io/runbooks#tls-certificate-expiring"
+            action: "Renew certificate with cert-manager or Let's Encrypt"

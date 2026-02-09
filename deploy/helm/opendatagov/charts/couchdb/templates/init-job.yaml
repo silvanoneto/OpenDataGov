@@ -1,0 +1,59 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "couchdb.fullname" . }}-init-databases
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "couchdb.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "couchdb.selectorLabels" . | nindent 8 }}
+        job: init-databases
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-couchdb
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for CouchDB to be ready..."
+              until curl -f -u {{ .Values.adminUsername }}:{{ .Values.adminPassword }} \
+                http://{{ include "couchdb.fullname" . }}-svc:{{ .Values.service.port }}/_up; do
+                echo "CouchDB not ready yet, waiting 5s..."
+                sleep 5
+              done
+              echo "CouchDB is ready!"
+      containers:
+        - name: init-databases
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              COUCH_URL="http://{{ include "couchdb.fullname" . }}-svc:{{ .Values.service.port }}"
+              AUTH="{{ .Values.adminUsername }}:{{ .Values.adminPassword }}"
+
+              echo "Initializing CouchDB databases..."
+
+              {{- range .Values.initDatabases }}
+              echo "Creating database: {{ . }}"
+              curl -X PUT -u $AUTH $COUCH_URL/{{ . }} || echo "Database {{ . }} already exists"
+              {{- end }}
+
+              echo "Setting up cluster..."
+              curl -X POST -u $AUTH $COUCH_URL/_cluster_setup \
+                -H "Content-Type: application/json" \
+                -d '{"action": "finish_cluster"}' || echo "Cluster already configured"
+
+              echo "Database initialization complete!"

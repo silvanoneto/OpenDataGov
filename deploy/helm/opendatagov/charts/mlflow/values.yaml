@@ -1,0 +1,153 @@
+# Default values for mlflow chart
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mlflow/mlflow
+  pullPolicy: IfNotPresent
+  tag: "2.10.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 5000
+  targetPort: 5000
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: mlflow.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Backend configuration
+backend:
+  postgresql:
+    enabled: true
+    host: ""  # Auto-generated from release name if empty
+    port: 5432
+    database: mlflow
+    existingSecret: ""  # Use existing secret or create from values
+    secretKey: "password"
+
+  # Artifact store configuration (MinIO/S3)
+  artifactStore:
+    type: s3  # s3 or local
+    s3:
+      endpointUrl: ""  # Auto-configured to MinIO if empty
+      bucket: mlflow-artifacts
+      accessKeyId: ""
+      secretAccessKey: ""
+      existingSecret: ""  # Use existing secret
+      secretAccessKeyKey: "secretAccessKey"
+      accessKeyIdKey: "accessKeyId"
+
+# Governance integration with B-Swarm
+governance:
+  enabled: false  # Disabled in dev profile
+  governanceEngineUrl: "http://governance-engine:8000"
+  promotionRequiresApproval: true
+  # RACI roles for model promotion
+  raci:
+    responsible: "data_scientist"  # Initiates promotion
+    accountable: "data_architect"  # Approves promotion
+    consulted: "data_owner"        # Must be consulted
+    informed: "data_steward"       # Must be informed
+
+# High availability configuration (large profile)
+ha:
+  enabled: false
+  readReplicas: 0
+
+# Monitoring and observability
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+
+# PostgreSQL subchart configuration
+postgresql:
+  enabled: true
+  auth:
+    database: mlflow
+    username: mlflow
+    existingSecret: ""
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Vault integration for secrets
+vault:
+  enabled: false
+  role: mlflow
+  secretPath: secret/data/mlflow
+
+# Extra environment variables
+extraEnv: []
+
+# Extra volumes
+extraVolumes: []
+
+# Extra volume mounts
+extraVolumeMounts: []

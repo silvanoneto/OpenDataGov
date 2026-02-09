@@ -1,0 +1,147 @@
+{{- if .Values.podSecurity.enabled }}
+---
+# Namespace labels for Pod Security Standards
+# Reference: https://kubernetes.io/docs/concepts/security/pod-security-standards/
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    # Pod Security Standards enforcement
+    {{- if eq .Values.podSecurity.enforce "restricted" }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+    {{- else if eq .Values.podSecurity.enforce "baseline" }}
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+    {{- else }}
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/warn-version: latest
+    {{- end }}
+
+---
+# ServiceAccount for application pods (least privilege)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-app
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Governance Engine
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: governance-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: governance-engine
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Lakehouse Agent
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lakehouse-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lakehouse-agent
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Quality Gate
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: quality-gate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: quality-gate
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Data Expert
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-expert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data-expert
+automountServiceAccountToken: true
+
+---
+# ServiceAccount for Gateway
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+automountServiceAccountToken: true
+
+---
+# Role for Vault auth (read service account token)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-vault-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    verbs: ["create"]
+
+---
+# RoleBinding for Vault auth
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-vault-auth
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "opendatagov.fullname" . }}-vault-auth
+subjects:
+  - kind: ServiceAccount
+    name: governance-engine
+    namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: lakehouse-agent
+    namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: quality-gate
+    namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: data-expert
+    namespace: {{ .Release.Namespace }}
+
+{{- end }}

@@ -1,0 +1,116 @@
+{{- if .Values.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kserve.fullname" . }}-controller
+  labels:
+    {{- include "kserve.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+    control-plane: kserve-controller-manager
+spec:
+  replicas: {{ .Values.controller.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kserve.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+      control-plane: kserve-controller-manager
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        {{- include "kserve.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+        control-plane: kserve-controller-manager
+    spec:
+      serviceAccountName: {{ include "kserve.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: manager
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
+        imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+        command:
+          - /manager
+        args:
+          - --metrics-addr=:8080
+          - --enable-leader-election
+          {{- if .Values.governanceWebhook.enabled }}
+          - --governance-webhook-url={{ .Values.governanceWebhook.url }}
+          {{- end }}
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: SECRET_NAME
+          value: kserve-webhook-server-cert
+        {{- if .Values.storage.s3.enabled }}
+        - name: AWS_ENDPOINT_URL
+          value: "http://{{ include "kserve.minio.endpoint" . }}"
+        - name: AWS_REGION
+          value: {{ .Values.storage.s3.region | quote }}
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.storage.s3.existingSecret | default (printf "%s-s3" (include "kserve.fullname" .)) }}
+              key: accessKeyId
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.storage.s3.existingSecret | default (printf "%s-s3" (include "kserve.fullname" .)) }}
+              key: secretAccessKey
+        {{- end }}
+        {{- if .Values.monitoring.openTelemetry.enabled }}
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: {{ .Values.monitoring.openTelemetry.collectorUrl | quote }}
+        {{- end }}
+        {{- with .Values.extraEnv }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          {{- toYaml .Values.controller.resources | nindent 10 }}
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: kserve-webhook-server-cert
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+{{- end }}

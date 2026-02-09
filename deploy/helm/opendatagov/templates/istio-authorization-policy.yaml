@@ -1,0 +1,236 @@
+{{- if .Values.istio.enabled }}
+---
+# Default deny-all policy (zero-trust)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-deny-all
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: istio-security
+spec:
+  {}  # Empty spec = deny all by default
+
+---
+# Allow health checks and metrics scraping
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-allow-health-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: istio-security
+spec:
+  action: ALLOW
+  rules:
+  # Allow health checks from kubelet
+  - to:
+    - operation:
+        paths: ["/health", "/healthz", "/ready", "/readyz", "/live", "/livez"]
+        methods: ["GET"]
+  # Allow metrics scraping from Prometheus
+  - to:
+    - operation:
+        paths: ["/metrics"]
+        methods: ["GET"]
+    from:
+    - source:
+        namespaces: ["monitoring", "istio-system"]
+
+---
+# Governance Engine Authorization
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-governance-engine
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: governance-engine
+spec:
+  selector:
+    matchLabels:
+      app: governance-engine
+  action: ALLOW
+  rules:
+  # Allow Gateway to call HTTP API
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/gateway"]
+    to:
+    - operation:
+        ports: ["8000"]
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+
+  # Allow Lakehouse Agent to call gRPC API
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/lakehouse-agent"]
+    to:
+    - operation:
+        ports: ["50051"]
+
+  # Allow Quality Gate to call gRPC API
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/quality-gate"]
+    to:
+    - operation:
+        ports: ["50051"]
+
+  # Allow Data Expert to call HTTP API
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/data-expert"]
+    to:
+    - operation:
+        ports: ["8000"]
+        methods: ["GET", "POST"]
+
+---
+# Lakehouse Agent Authorization
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-lakehouse-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: lakehouse-agent
+spec:
+  selector:
+    matchLabels:
+      app: lakehouse-agent
+  action: ALLOW
+  rules:
+  # Allow Governance Engine to call API
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/governance-engine"]
+    to:
+    - operation:
+        ports: ["8001"]
+
+  # Allow Gateway to call API
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/gateway"]
+    to:
+    - operation:
+        ports: ["8001"]
+        methods: ["GET", "POST"]
+
+  # Allow Data Expert to call API
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/data-expert"]
+    to:
+    - operation:
+        ports: ["8001"]
+
+---
+# Quality Gate Authorization
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-quality-gate
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: quality-gate
+spec:
+  selector:
+    matchLabels:
+      app: quality-gate
+  action: ALLOW
+  rules:
+  # Allow Governance Engine to trigger quality checks
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/governance-engine"]
+    to:
+    - operation:
+        ports: ["8002"]
+        methods: ["POST"]
+
+  # Allow Lakehouse Agent to trigger quality checks
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/lakehouse-agent"]
+    to:
+    - operation:
+        ports: ["8002"]
+        methods: ["POST"]
+
+  # Allow Gateway to query quality results
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/gateway"]
+    to:
+    - operation:
+        ports: ["8002"]
+        methods: ["GET"]
+
+---
+# Data Expert Authorization (AI Agent)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-data-expert
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data-expert
+spec:
+  selector:
+    matchLabels:
+      app: data-expert
+  action: ALLOW
+  rules:
+  # Allow Gateway to interact with AI agent
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/gateway"]
+    to:
+    - operation:
+        ports: ["8003"]
+        methods: ["GET", "POST"]
+
+  # Allow self-service portal interactions
+  - from:
+    - source:
+        principals: ["cluster.local/ns/{{ .Release.Namespace }}/sa/governance-engine"]
+    to:
+    - operation:
+        ports: ["8003"]
+        methods: ["POST"]
+
+---
+# Gateway Authorization (ingress traffic)
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  selector:
+    matchLabels:
+      app: gateway
+  action: ALLOW
+  rules:
+  # Allow all authenticated requests from ingress
+  - from:
+    - source:
+        namespaces: ["istio-system"]
+        principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway-service-account"]
+  # Allow requests from within namespace (for testing)
+  - from:
+    - source:
+        namespaces: ["{{ .Release.Namespace }}"]
+
+{{- end }}

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: quality-gate
+description: OpenDataGov Quality Gate - Core data quality validation and gate service
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - quality
+  - data-quality
+  - decision-engine
+home: https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team

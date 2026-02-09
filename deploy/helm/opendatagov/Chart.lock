@@ -1,0 +1,42 @@
+dependencies:
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 15.5.38
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 19.6.4
+- name: kafka
+  repository: file://./charts/kafka
+  version: 0.1.0
+- name: minio
+  repository: https://charts.bitnami.com/bitnami
+  version: 14.10.5
+- name: trino
+  repository: https://trinodb.github.io/charts
+  version: 0.24.0
+- name: airflow
+  repository: https://airflow.apache.org
+  version: 1.15.0
+- name: superset
+  repository: https://apache.github.io/superset
+  version: 0.12.11
+- name: qdrant
+  repository: https://qdrant.github.io/qdrant-helm
+  version: 0.8.5
+- name: datahub
+  repository: https://helm.datahubproject.io
+  version: 0.4.25
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 8.5.2
+- name: loki
+  repository: https://grafana.github.io/helm-charts
+  version: 6.16.0
+- name: tempo
+  repository: https://grafana.github.io/helm-charts
+  version: 1.10.3
+- name: keycloak
+  repository: https://charts.bitnami.com/bitnami
+  version: 22.2.3
+digest: sha256:3b293d2592082e447f420fd08ac00491a854e1b35d91634f20755648568d906f
+generated: "2026-02-08T15:36:33.152331-03:00"

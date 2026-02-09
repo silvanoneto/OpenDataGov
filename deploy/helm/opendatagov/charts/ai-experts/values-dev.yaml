@@ -1,0 +1,75 @@
+# Dev Profile - AI Experts
+# Minimal resources, no GPU, all experts enabled for testing
+
+ragExpert:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  autoscaling:
+    enabled: false
+
+codeExpert:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+
+visionExpert:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  gpu:
+    enabled: false
+  autoscaling:
+    enabled: false
+
+nlpExpert:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+  autoscaling:
+    enabled: false
+
+qdrant:
+  enabled: true
+  replicaCount: 1
+  persistence:
+    enabled: false  # Use emptyDir for dev
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+monitoring:
+  enabled: false  # Disable monitoring in dev
+
+networkPolicy:
+  enabled: false  # Disable network policies in dev

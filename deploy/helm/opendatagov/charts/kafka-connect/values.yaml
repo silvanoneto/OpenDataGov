@@ -1,0 +1,164 @@
+# Kafka Connect with Debezium for CDC
+# Captures database changes and publishes to Kafka topics
+
+replicaCount: 2
+
+image:
+  repository: debezium/connect
+  tag: "2.5.0.Final"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8083  # REST API port
+
+# Kafka connection
+kafka:
+  bootstrapServers: "kafka:9092"
+  groupId: "kafka-connect-cluster"
+
+# Configuration
+config:
+  # Connector plugins to enable
+  plugins:
+    - debezium-connector-postgresql
+    - debezium-connector-mysql
+    - confluentinc-kafka-connect-jdbc
+
+  # Offsets storage (where Connect stores its state)
+  offsetStorage: "kafka"
+  offsetsTopic: "connect-offsets"
+  offsetsReplicationFactor: 1
+
+  # Config storage
+  configStorage: "kafka"
+  configTopic: "connect-configs"
+  configReplicationFactor: 1
+
+  # Status storage
+  statusStorage: "kafka"
+  statusTopic: "connect-status"
+  statusReplicationFactor: 1
+
+  # Converter settings (how data is serialized to Kafka)
+  keyConverter: "org.apache.kafka.connect.json.JsonConverter"
+  valueConverter: "org.apache.kafka.connect.json.JsonConverter"
+  keyConverterSchemasEnable: false
+  valueConverterSchemasEnable: true
+
+  # Worker settings
+  tasksMax: 4
+
+# CDC Sources Configuration
+sources:
+  postgresql:
+    enabled: true
+    host: "postgresql"
+    port: 5432
+    database: "odg"
+    user: "postgres"
+    password: "postgres"
+
+    # Tables to capture (regex patterns)
+    tableIncludeList: |
+      public.governance_decisions,
+      public.approval_records,
+      public.veto_records,
+      public.audit_events,
+      public.pipeline_versions,
+      public.pipeline_executions,
+      public.lineage_events,
+      public.model_cards,
+      public.quality_reports,
+      public.data_contracts
+
+    # Slot name for logical replication
+    slotName: "debezium_odg"
+
+    # Publication name
+    publicationName: "debezium_publication"
+
+  timescaledb:
+    enabled: true
+    host: "timescaledb"
+    port: 5432
+    database: "timescale"
+    user: "timescale"
+    password: "timescale123"
+
+    # Tables to capture
+    tableIncludeList: |
+      public.model_performance_ts,
+      public.quality_metrics_ts,
+      public.pipeline_metrics_ts
+
+# Connectors to register on init (used by connector-init-job)
+connectors:
+  postgresql:
+    enabled: false
+  timescaledb:
+    enabled: false
+
+# Error handling
+errorHandling:
+  tolerance: "all"
+  logEnable: true
+  logIncludeMessages: true
+
+# Resource limits
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /
+    port: 8083
+  initialDelaySeconds: 60
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /connectors
+    port: 8083
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Pod Security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false  # Connect needs write access for plugins
+
+# Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Node selector
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+  metrics:
+    port: 9404
+    path: /metrics

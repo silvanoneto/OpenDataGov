@@ -1,0 +1,194 @@
+===================================
+OpenDataGov {{ .Chart.Version }} - {{ .Values.global.profile | upper }} Profile
+===================================
+
+Thank you for installing OpenDataGov!
+
+Your release is named: {{ .Release.Name }}
+Deployed to namespace: {{ .Release.Namespace }}
+Profile: {{ .Values.global.profile }}
+
+===================================
+Access Your Services
+===================================
+
+{{- if index .Values "governance-engine" "enabled" }}
+
+1. Governance Engine (Core Service)
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.governance-engine.fullname" . }} 8000:8000
+
+   Access at: http://localhost:8000/docs
+   Health check: http://localhost:8000/health
+   GraphQL: http://localhost:8000/graphql
+   gRPC: localhost:50051
+{{- end }}
+
+{{- if index .Values "lakehouse-agent" "enabled" }}
+
+2. Lakehouse Agent
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.lakehouse-agent.fullname" . }} 8001:8001
+
+   Access at: http://localhost:8001/docs
+{{- end }}
+
+{{- if index .Values "data-expert" "enabled" }}
+
+3. Data Expert (AI Assistant)
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.data-expert.fullname" . }} 8002:8002
+
+   Access at: http://localhost:8002/docs
+{{- end }}
+
+{{- if index .Values "quality-gate" "enabled" }}
+
+4. Quality Gate
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.quality-gate.fullname" . }} 8003:8003
+
+   Access at: http://localhost:8003/docs
+{{- end }}
+
+{{- if .Values.gateway.enabled }}
+
+5. API Gateway
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.gateway.fullname" . }} 8080:8080
+
+   Access at: http://localhost:8080
+{{- end }}
+
+===================================
+Layer 5 Components (Analytics)
+===================================
+
+{{- if .Values.trino.enabled }}
+
+Trino (SQL Query Engine)
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.trino.fullname" . }}-coordinator 8080:8080
+
+   Access at: http://localhost:8080
+{{- end }}
+
+{{- if .Values.airflow.enabled }}
+
+Airflow (Workflow Orchestration)
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.airflow.fullname" . }}-webserver 8080:8080
+
+   Access at: http://localhost:8080
+   Default credentials: admin/admin (change in production!)
+{{- end }}
+
+{{- if .Values.superset.enabled }}
+
+Superset (BI & Analytics)
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.superset.fullname" . }} 8088:8088
+
+   Access at: http://localhost:8088
+{{- end }}
+
+===================================
+Infrastructure Services
+===================================
+
+{{- if .Values.postgresql.enabled }}
+
+PostgreSQL
+   Host: {{ include "opendatagov.postgresql.fullname" . }}:5432
+   Database: {{ .Values.postgresql.auth.database }}
+   Username: {{ .Values.postgresql.auth.username }}
+{{- end }}
+
+{{- if .Values.redis.enabled }}
+
+Redis
+   Host: {{ include "opendatagov.redis.fullname" . }}:6379
+{{- end }}
+
+{{- if .Values.minio.enabled }}
+
+MinIO (Object Storage)
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.minio.fullname" . }} 9001:9001
+
+   Console: http://localhost:9001
+   Username: {{ .Values.minio.auth.rootUser }}
+{{- end }}
+
+===================================
+Observability
+===================================
+
+{{- if .Values.grafana.enabled }}
+
+Grafana
+   Port-forward command:
+   kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "opendatagov.grafana.fullname" . }} 3000:3000
+
+   Access at: http://localhost:3000
+   Default credentials: admin/admin
+{{- end }}
+
+{{- if .Values.tempo.enabled }}
+
+Tempo (Tracing)
+   Query frontend: {{ include "opendatagov.tempo.fullname" . }}:3100
+{{- end }}
+
+===================================
+Useful Commands
+===================================
+
+Check pod status:
+   kubectl get pods -n {{ .Release.Namespace }}
+
+View logs:
+   kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=governance-engine -f
+
+Scale deployment:
+   kubectl scale deployment -n {{ .Release.Namespace }} {{ include "opendatagov.governance-engine.fullname" . }} --replicas=3
+
+Upgrade to different profile:
+   helm upgrade {{ .Release.Name }} opendatagov/opendatagov -f values-{{ .Values.global.profile }}.yaml
+
+===================================
+Documentation
+===================================
+
+Full documentation: https://github.com/silvanoneto/opendatagov/tree/main/docs
+GraphQL API: /docs/API_GRAPHQL.md
+gRPC API: /docs/API_GRPC.md
+Architecture: /docs/ARCHITECTURE.md
+
+===================================
+Next Steps
+===================================
+
+{{- if eq .Values.global.profile "embedded" }}
+
+You're running the EMBEDDED profile (minimal resources).
+Consider upgrading to 'dev' or 'small' for full features:
+   helm upgrade {{ .Release.Name }} opendatagov/opendatagov -f values-dev.yaml
+{{- end }}
+
+{{- if eq .Values.global.profile "dev" }}
+
+You're running the DEV profile (development workloads).
+For production, consider 'small', 'medium', or 'large' profiles.
+{{- end }}
+
+{{- if or (eq .Values.global.profile "medium") (eq .Values.global.profile "large") }}
+
+{{- if .Values.global.gpu.enabled }}
+GPU support is ENABLED ({{ .Values.global.gpu.count }} GPU(s))
+{{- else }}
+GPU support is DISABLED. Enable in values.yaml for AI features.
+{{- end }}
+{{- end }}
+
+Happy Data Governance! 🎉

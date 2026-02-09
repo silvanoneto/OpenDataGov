@@ -1,0 +1,346 @@
+{
+  "dashboard": {
+    "title": "ML Drift Monitoring Dashboard",
+    "tags": ["mlops", "drift", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Drift Score Over Time",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "drift_score{model_name=~\"$model\"}",
+            "legendFormat": "{{model_name}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.3, "color": "yellow"},
+                {"value": 0.5, "color": "red"}
+              ]
+            }
+          }
+        },
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 2,
+        "title": "Current Drift Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "drift_detected_total",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Models Monitored",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "models_monitored",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Retraining Triggers (Last 24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "increase(retraining_triggered_total[24h])",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 3, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Feature Drift Heatmap",
+        "type": "heatmap",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "feature_drift_score{model_name=~\"$model\"}",
+            "format": "heatmap",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "calculate": true,
+          "cellGap": 2,
+          "color": {
+            "mode": "spectrum",
+            "scheme": "RdYlGn",
+            "exponent": 0.5
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Prediction Distribution Shift",
+        "type": "histogram",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "prediction_distribution_reference{model_name=~\"$model\"}",
+            "legendFormat": "Reference",
+            "refId": "A"
+          },
+          {
+            "expr": "prediction_distribution_current{model_name=~\"$model\"}",
+            "legendFormat": "Current",
+            "refId": "B"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 7,
+        "title": "Drift Detection Timeline",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "drift_events{model_name=~\"$model\"}",
+            "format": "table",
+            "instant": false,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "model_name": "Model",
+                "drift_score": "Drift Score",
+                "drifted_features": "Drifted Features",
+                "timestamp": "Time",
+                "decision_id": "Decision ID"
+              }
+            }
+          }
+        ],
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "displayName": "Time",
+              "desc": true
+            }
+          ]
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Drift Score"},
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"value": 0, "color": "green"},
+                      {"value": 0.3, "color": "yellow"},
+                      {"value": 0.5, "color": "red"}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "title": "Prediction Latency vs Drift",
+        "type": "scatter",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "prediction_latency_ms{model_name=~\"$model\"}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 9,
+        "title": "Model Sample Counts",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "prediction_sample_count{model_name=~\"$model\"}",
+            "legendFormat": "{{model_name}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 100, "color": "yellow"},
+                {"value": 1000, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Retraining Decision Status",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "retraining_decisions_by_status",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right"},
+          "pieType": "donut"
+        }
+      },
+      {
+        "id": 11,
+        "title": "Alerts: High Drift Models",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+        "targets": [
+          {
+            "expr": "{service=\"drift-monitor\"} |= \"Drift detected\" | json",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "wrapLogMessage": true,
+          "sortOrder": "Descending"
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "model",
+          "label": "Model",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(drift_score, model_name)",
+          "multi": true,
+          "includeAll": true,
+          "allValue": ".*",
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Retraining Triggered",
+          "datasource": "Prometheus",
+          "expr": "changes(retraining_triggered_total[1m]) > 0",
+          "iconColor": "red",
+          "tags": ["retraining"]
+        }
+      ]
+    }
+  }
+}

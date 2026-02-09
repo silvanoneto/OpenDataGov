@@ -1,6 +1,216 @@
 apiVersion: v2
 name: opendatagov
-description: Open-source data governance platform with progressive AI capabilities
+description: OpenDataGov - Open Source Data Governance Platform with AI
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
+keywords:
+  - data-governance
+  - data-quality
+  - data-catalog
+  - lakehouse
+  - ai
+home: https://github.com/silvanoneto/opendatagov
+sources:
+  - https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team
+
+dependencies:
+  # ─── Infrastructure ─────────────────────────────────────
+  - name: postgresql
+    version: "15.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    alias: postgresql
+
+  - name: redis
+    version: "19.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    alias: redis
+
+  - name: kafka
+    version: "0.1.0"
+    repository: "file://./charts/kafka"
+    condition: kafka.enabled
+
+  - name: minio
+    version: "14.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: minio.enabled
+    alias: minio
+
+  # ─── Analytics & Query Layer (Layer 5) ─────────────────
+  - name: trino
+    version: "0.24.0"
+    repository: https://trinodb.github.io/charts
+    condition: trino.enabled
+    alias: trino
+
+  - name: airflow
+    version: "1.15.0"
+    repository: https://airflow.apache.org
+    condition: airflow.enabled
+    alias: airflow
+
+  - name: superset
+    version: "0.12.11"
+    repository: https://apache.github.io/superset
+    condition: superset.enabled
+    alias: superset
+
+  # ─── AI & ML Components ────────────────────────────────
+  - name: qdrant
+    version: "0.8.5"
+    repository: https://qdrant.github.io/qdrant-helm
+    condition: qdrant.enabled
+    alias: qdrant
+
+  # ─── MLOps Stack ───────────────────────────────────────
+  - name: mlflow
+    version: "0.1.0"
+    repository: "file://./charts/mlflow"
+    condition: mlflow.enabled
+    alias: mlflow
+
+  # ─── Data Catalog ──────────────────────────────────────
+  - name: datahub
+    version: "0.4.25"
+    repository: https://helm.datahubproject.io
+    condition: datahub.enabled
+    alias: datahub
+
+  # ─── Observability ─────────────────────────────────────
+  - name: grafana
+    version: "8.5.2"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+    alias: grafana
+
+  - name: loki
+    version: "6.16.0"
+    repository: https://grafana.github.io/helm-charts
+    condition: loki.enabled
+    alias: loki
+
+  - name: tempo
+    version: "1.10.3"
+    repository: https://grafana.github.io/helm-charts
+    condition: tempo.enabled
+    alias: tempo
+
+  # ─── Auth & Security ───────────────────────────────────
+  - name: keycloak
+    version: "22.2.3"
+    repository: https://charts.bitnami.com/bitnami
+    condition: keycloak.enabled
+    alias: keycloak
+
+  - name: opa
+    version: "0.17.x"
+    repository: https://open-policy-agent.github.io/opa-helm-charts
+    condition: opa.enabled
+    alias: opa
+
+  - name: vault
+    version: "0.28.x"
+    repository: https://helm.releases.hashicorp.com
+    condition: vault.enabled
+    alias: vault
+
+  # ─── Certificate Management ────────────────────────────
+  - name: cert-manager
+    version: "v1.14.x"
+    repository: https://charts.jetstack.io
+    condition: certManager.enabled
+    alias: cert-manager
+
+  # ─── Service Mesh ──────────────────────────────────────
+  - name: base
+    version: "1.22.x"
+    repository: https://istio-release.storage.googleapis.com/charts
+    condition: istio.enabled
+    alias: istio-base
+
+  - name: istiod
+    version: "1.22.x"
+    repository: https://istio-release.storage.googleapis.com/charts
+    condition: istio.enabled
+    alias: istiod
+
+  # ─── Local Subcharts ─────────────────────────────────
+  - name: gateway
+    version: "0.1.0"
+    repository: "file://./charts/gateway"
+    condition: gateway.enabled
+
+  - name: governance-engine
+    version: "0.1.0"
+    repository: "file://./charts/governance-engine"
+    condition: governance-engine.enabled
+
+  - name: lakehouse-agent
+    version: "0.1.0"
+    repository: "file://./charts/lakehouse-agent"
+    condition: lakehouse-agent.enabled
+
+  - name: data-expert
+    version: "0.1.0"
+    repository: "file://./charts/data-expert"
+    condition: data-expert.enabled
+
+  - name: quality-gate
+    version: "0.1.0"
+    repository: "file://./charts/quality-gate"
+    condition: quality-gate.enabled
+
+  - name: ai-experts
+    version: "0.1.0"
+    repository: "file://./charts/ai-experts"
+    condition: ai-experts.enabled
+
+  - name: feast
+    version: "0.1.0"
+    repository: "file://./charts/feast"
+    condition: feast.enabled
+
+  - name: flink
+    version: "0.1.0"
+    repository: "file://./charts/flink"
+    condition: flink.enabled
+
+  - name: kserve
+    version: "0.1.0"
+    repository: "file://./charts/kserve"
+    condition: kserve.enabled
+
+  - name: kubeflow-pipelines
+    version: "0.1.0"
+    repository: "file://./charts/kubeflow-pipelines"
+    condition: kubeflow-pipelines.enabled
+
+  - name: timescaledb
+    version: "0.1.0"
+    repository: "file://./charts/timescaledb"
+    condition: timescaledb.enabled
+
+  - name: janusgraph
+    version: "0.1.0"
+    repository: "file://./charts/janusgraph"
+    condition: janusgraph.enabled
+
+  - name: cassandra
+    version: "0.1.0"
+    repository: "file://./charts/cassandra"
+    condition: cassandra.enabled
+
+  - name: couchdb
+    version: "0.1.0"
+    repository: "file://./charts/couchdb"
+    condition: couchdb.enabled
+
+  - name: kafka-connect
+    version: "0.1.0"
+    repository: "file://./charts/kafka-connect"
+    condition: kafka-connect.enabled

@@ -1,0 +1,422 @@
+{
+  "dashboard": {
+    "title": "OpenDataGov Security Dashboard",
+    "tags": ["security", "compliance", "audit"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Authentication Attempts",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"2..\"}[5m])) by (endpoint)",
+            "legendFormat": "Successful - {{endpoint}}",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{status=\"401\"}[5m])) by (endpoint)",
+            "legendFormat": "Unauthorized (401) - {{endpoint}}",
+            "refId": "B"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{status=\"403\"}[5m])) by (endpoint)",
+            "legendFormat": "Forbidden (403) - {{endpoint}}",
+            "refId": "C"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 2,
+        "title": "Failed Auth Rate (Last 5min)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=~\"401|403\"}[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 10, "color": "red"}
+              ]
+            },
+            "unit": "reqps"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Active Sessions",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "count(keycloak_sessions_active)",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "OPA Policy Evaluations",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(opa_decision_total{decision=\"allow\"}[5m]))",
+            "legendFormat": "Allowed",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(opa_decision_total{decision=\"deny\"}[5m]))",
+            "legendFormat": "Denied",
+            "refId": "B"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 5,
+        "title": "OPA Deny Rate",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(opa_decision_total{decision=\"deny\"}[5m])) / sum(rate(opa_decision_total[5m])) * 100",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": false,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 20, "color": "red"}
+              ]
+            },
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Policy Evaluation Time (p95)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 4},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(opa_decision_duration_seconds_bucket[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 0.1, "color": "yellow"},
+                {"value": 0.5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "mTLS Connection Status",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(istio_requests_total{connection_security_policy=\"mutual_tls\"}) by (connection_security_policy)",
+            "legendFormat": "mTLS",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(istio_requests_total{connection_security_policy!=\"mutual_tls\"}) by (connection_security_policy)",
+            "legendFormat": "{{connection_security_policy}}",
+            "refId": "B"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right"}
+        }
+      },
+      {
+        "id": 8,
+        "title": "mTLS Requests Rate",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 8, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(istio_requests_total{connection_security_policy=\"mutual_tls\"}[5m]))",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Certificate Expiration (Days)",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+        "targets": [
+          {
+            "expr": "(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {"Time": true, "__name__": true},
+              "indexByName": {},
+              "renameByName": {
+                "name": "Certificate",
+                "namespace": "Namespace",
+                "Value": "Days Until Expiration"
+              }
+            }
+          }
+        ],
+        "options": {
+          "showHeader": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "align": "auto",
+              "displayMode": "auto"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 15, "color": "yellow"},
+                {"value": 30, "color": "green"}
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Days Until Expiration"},
+              "properties": [
+                {
+                  "id": "custom.displayMode",
+                  "value": "color-background"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "title": "Audit Events Per Second",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(rate(kafka_messages_in_per_sec{topic=\"odg.audit.events\"}[5m]))",
+            "legendFormat": "Audit Events",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"}
+        }
+      },
+      {
+        "id": 11,
+        "title": "Audit Chain Integrity",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 20},
+        "targets": [
+          {
+            "expr": "audit_chain_integrity_valid",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "value_and_name"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "value": "1", "text": "VALID"},
+              {"type": "value", "value": "0", "text": "BROKEN"}
+            ],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Total Encrypted Audit Events",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 20},
+        "targets": [
+          {
+            "expr": "audit_events_total",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 13,
+        "title": "Vault Secret Access Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(rate(vault_secret_kv_count[5m])) by (operation)",
+            "legendFormat": "{{operation}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right"}
+        }
+      },
+      {
+        "id": 14,
+        "title": "Network Policy Violations",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+        "targets": [
+          {
+            "expr": "{app=\"cilium\"} |= \"denied\" | json",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showTime": true,
+          "wrapLogMessage": true
+        }
+      },
+      {
+        "id": 15,
+        "title": "Security Events by Type (Last 24h)",
+        "type": "barchart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+        "targets": [
+          {
+            "expr": "sum(increase(security_events_total[24h])) by (event_type)",
+            "legendFormat": "{{event_type}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "legend": {"displayMode": "table", "placement": "right"}
+        }
+      },
+      {
+        "id": 16,
+        "title": "Top Failed Auth Sources",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+        "targets": [
+          {
+            "expr": "topk(10, sum(increase(http_requests_total{status=~\"401|403\"}[1h])) by (source_ip))",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "source_ip": "Source IP",
+                "Value": "Failed Attempts (1h)"
+              }
+            }
+          }
+        ],
+        "options": {
+          "showHeader": true
+        }
+      }
+    ]
+  }
+}

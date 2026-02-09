@@ -137,7 +137,7 @@ class TestEmitLineageEvent:
         assert isinstance(event, LineageRunEvent)
         assert event.event_type == "COMPLETE"
         assert event.job.name == "promotion.bronze_to_silver"
-        assert event.job.namespace == "opendatagov"
+        assert event.job.namespace == "lakehouse"
         assert len(event.inputs) == 1
         assert len(event.outputs) == 1
         assert event.inputs[0].namespace == "s3"

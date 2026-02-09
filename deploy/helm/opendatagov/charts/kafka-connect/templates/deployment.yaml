@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kafka-connect.fullname" . }}
+  labels:
+    {{- include "kafka-connect.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kafka-connect.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "kafka-connect.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kafka-connect.serviceAccountName" . }}
+      containers:
+      - name: kafka-connect
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        ports:
+        - name: http
+          containerPort: 8083
+          protocol: TCP
+        - name: metrics
+          containerPort: 9404
+          protocol: TCP
+        env:
+        # Kafka bootstrap servers
+        - name: BOOTSTRAP_SERVERS
+          value: {{ .Values.kafka.bootstrapServers | quote }}
+
+        # Group ID
+        - name: GROUP_ID
+          value: {{ .Values.kafka.groupId | quote }}
+
+        # Offsets storage
+        - name: OFFSET_STORAGE_TOPIC
+          value: {{ .Values.config.offsetsTopic | quote }}
+        - name: OFFSET_STORAGE_REPLICATION_FACTOR
+          value: {{ .Values.config.offsetsReplicationFactor | quote }}
+
+        # Config storage
+        - name: CONFIG_STORAGE_TOPIC
+          value: {{ .Values.config.configTopic | quote }}
+        - name: CONFIG_STORAGE_REPLICATION_FACTOR
+          value: {{ .Values.config.configReplicationFactor | quote }}
+
+        # Status storage
+        - name: STATUS_STORAGE_TOPIC
+          value: {{ .Values.config.statusTopic | quote }}
+        - name: STATUS_STORAGE_REPLICATION_FACTOR
+          value: {{ .Values.config.statusReplicationFactor | quote }}
+
+        # Converters
+        - name: KEY_CONVERTER
+          value: {{ .Values.config.keyConverter | quote }}
+        - name: VALUE_CONVERTER
+          value: {{ .Values.config.valueConverter | quote }}
+        - name: KEY_CONVERTER_SCHEMAS_ENABLE
+          value: {{ .Values.config.keyConverterSchemasEnable | quote }}
+        - name: VALUE_CONVERTER_SCHEMAS_ENABLE
+          value: {{ .Values.config.valueConverterSchemasEnable | quote }}
+
+        # Worker settings
+        - name: CONNECT_PLUGIN_PATH
+          value: "/kafka/connect"
+
+        # JMX monitoring
+        - name: KAFKA_JMX_PORT
+          value: "9404"
+        - name: KAFKA_JMX_HOSTNAME
+          value: "localhost"
+
+        {{- with .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+        {{- with .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+
+        volumeMounts:
+        - name: connect-plugins
+          mountPath: /kafka/connect
+
+      volumes:
+      - name: connect-plugins
+        emptyDir: {}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

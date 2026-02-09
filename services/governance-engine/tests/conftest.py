@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import AsyncGenerator
+from unittest.mock import MagicMock
 
 import pytest
+from fastapi import FastAPI, HTTPException, Request
 from governance_engine.domain.approval_service import ApprovalService
 from governance_engine.domain.audit_service import AuditService
 from governance_engine.domain.decision_service import DecisionService
 from governance_engine.domain.role_service import RoleService
 from governance_engine.domain.veto_service import VetoService
+from httpx import AsyncClient
 from odg_core.audit import AuditEvent
-from odg_core.enums import AuditEventType, DecisionStatus
+from odg_core.auth.dependencies import get_current_user
+from odg_core.auth.models import UserContext
+from odg_core.enums import AuditEventType, DecisionStatus, RACIRole
 from odg_core.models import ApprovalRecord, GovernanceDecision, RACIAssignment, VetoRecord
 
 # ─── In-memory mock repositories ─────────────────────────
@@ -240,3 +246,64 @@ def veto_service(
         decision_service=decision_service,
         audit=audit_service,
     )
+
+
+@pytest.fixture
+def app(
+    decision_service: DecisionService,
+    audit_service: AuditService,
+    approval_service: ApprovalService,
+    veto_service: VetoService,
+    role_service: RoleService,
+) -> FastAPI:
+    """Create a test FastAPI app with mocked dependencies."""
+    from governance_engine.api.deps import (
+        get_approval_service,
+        get_audit_service,
+        get_decision_service,
+        get_role_service,
+        get_veto_service,
+    )
+    from governance_engine.main import app as main_app
+
+    # Mock session factory to avoid starlette state error
+    main_app.state.session_factory = MagicMock()
+
+    # Override dependencies
+    main_app.dependency_overrides[get_decision_service] = lambda: decision_service
+    main_app.dependency_overrides[get_audit_service] = lambda: audit_service
+    main_app.dependency_overrides[get_approval_service] = lambda: approval_service
+    main_app.dependency_overrides[get_veto_service] = lambda: veto_service
+    main_app.dependency_overrides[get_role_service] = lambda: role_service
+
+    async def _get_mock_user(request: Request) -> UserContext:
+        auth = request.headers.get("Authorization")
+        if not auth:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        # Simple mock: use the token as the user_id if it's not "Bearer ..."
+        user_id = "ds-001"  # Default to what tests expect
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+            if token and token != "mock-token":
+                user_id = token
+
+        return UserContext(
+            user_id=user_id,
+            username=user_id,
+            roles=[RACIRole.RESPONSIBLE, RACIRole.ACCOUNTABLE, RACIRole.CONSULTED],
+            is_authenticated=True,
+        )
+
+    main_app.dependency_overrides[get_current_user] = _get_mock_user
+
+    return main_app
+
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncGenerator[AsyncClient]:
+    """Create a test client for the FastAPI app."""
+    from httpx import ASGITransport, AsyncClient
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac

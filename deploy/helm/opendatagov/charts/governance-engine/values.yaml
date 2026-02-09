@@ -1,0 +1,143 @@
+# Default values for governance-engine sub-chart
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+enabled: true
+replicaCount: 1
+
+image:
+  repository: opendatagov/governance-engine
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+
+service:
+  type: ClusterIP
+  port: 8000
+  grpcPort: 50051
+  targetPort: 8000
+  grpcTargetPort: 50051
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: governance.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+volumes: []
+volumeMounts: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+env:
+  ENVIRONMENT: dev
+  LOG_LEVEL: INFO
+  ENABLE_GRPC: "true"
+  ENABLE_GRAPHQL: "true"
+  ENABLE_REST: "true"
+  WORKERS: "4"
+
+# Database configuration (will be overridden by parent chart)
+postgresql:
+  host: postgresql
+  port: 5432
+  database: odg
+  username: odg
+
+# Redis configuration (will be overridden by parent chart)
+redis:
+  host: redis-master
+  port: 6379
+
+# Kafka configuration (will be overridden by parent chart)
+kafka:
+  bootstrapServers: kafka:9092
+
+# MinIO configuration (will be overridden by parent chart)
+minio:
+  endpoint: minio:9000
+  useSsl: false
+
+# Observability
+observability:
+  otelEndpoint: ""
+  jaegerAgent: ""
+  metricsEnabled: true
+  tracingEnabled: true
+
+# Service Monitor for Prometheus
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}

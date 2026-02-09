@@ -103,3 +103,111 @@ gateway:
     limits:
       cpu: 100m
       memory: 64Mi
+
+# ─── MLOps (dev) ─────────────────────────────────────────
+
+mlflow:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  backend:
+    postgresql:
+      enabled: true
+      host: ""  # Auto-configured to shared PostgreSQL
+    artifactStore:
+      type: s3
+      s3:
+        endpointUrl: ""  # Auto-configured to MinIO
+        bucket: mlflow-artifacts
+  governance:
+    enabled: false  # No approval required in dev
+    promotionRequiresApproval: false
+  postgresql:
+    enabled: false  # Use shared PostgreSQL instance
+
+# ─── Security (dev) ──────────────────────────────────────
+
+keycloak:
+  enabled: true
+  auth:
+    adminUser: admin
+    adminPassword: admin
+  postgresql:
+    enabled: false  # Use shared PostgreSQL
+  externalDatabase:
+    host: "{{ .Release.Name }}-postgresql"
+    port: 5432
+    user: odg
+    database: odg
+    password: testpass123
+  service:
+    type: ClusterIP
+    ports:
+      http: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistence:
+    enabled: false  # Ephemeral for dev
+
+opa:
+  enabled: true
+  replicas: 1
+  admissionControllerKind: ""  # Don't use as admission controller
+  mgmt:
+    enabled: true
+  authz:
+    enabled: false  # We use OPA as a library
+  bootstrapPolicies:
+    configMapName: "{{ .Release.Name }}-opa-policies"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+vault:
+  enabled: true
+  server:
+    dev:
+      enabled: true  # Dev mode (in-memory)
+      devRootToken: "root"
+    ha:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+    dataStorage:
+      enabled: false  # No persistence in dev mode
+    auditStorage:
+      enabled: false
+
+istio:
+  enabled: false  # Optional for dev
+
+networkPolicies:
+  enabled: true
+  enforceMode: false  # Advisory mode for dev
+
+certManager:
+  enabled: false  # Not needed for dev
+
+podSecurity:
+  enabled: true
+  enforce: baseline  # Baseline for dev (permissive)

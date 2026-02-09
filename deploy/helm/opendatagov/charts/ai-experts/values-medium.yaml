@@ -1,0 +1,98 @@
+# Medium Profile - AI Experts
+# Production-ready with autoscaling, GPU support, monitoring
+
+ragExpert:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPU: 70
+
+codeExpert:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPU: 70
+
+visionExpert:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  gpu:
+    enabled: true  # GPU acceleration
+    count: 1
+  env:
+    - name: MODEL_NAME
+      value: openai/clip-vit-base-patch32
+    - name: DEVICE
+      value: cuda  # Use GPU
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPU: 70
+
+nlpExpert:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPU: 70
+
+qdrant:
+  enabled: true
+  replicaCount: 2
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: fast-ssd
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+networkPolicy:
+  enabled: true

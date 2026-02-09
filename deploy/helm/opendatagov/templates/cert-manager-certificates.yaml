@@ -1,0 +1,208 @@
+{{- if .Values.certManager.enabled }}
+---
+# Self-signed ClusterIssuer (for dev/small)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-selfsigned
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cert-manager
+spec:
+  selfSigned: {}
+
+---
+# CA Issuer (for production)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-ca
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cert-manager
+spec:
+  ca:
+    secretName: {{ include "opendatagov.fullname" . }}-ca-key-pair
+
+---
+# Root CA Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-ca
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cert-manager
+spec:
+  isCA: true
+  commonName: OpenDataGov Root CA
+  secretName: {{ include "opendatagov.fullname" . }}-ca-key-pair
+  duration: 87600h  # 10 years
+  renewBefore: 8760h  # Renew 1 year before expiration
+  privateKey:
+    algorithm: RSA
+    size: 4096
+  issuerRef:
+    name: {{ include "opendatagov.fullname" . }}-selfsigned
+    kind: ClusterIssuer
+
+---
+# Governance Engine gRPC Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-governance-engine-grpc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: governance-engine
+spec:
+  secretName: governance-engine-grpc-tls
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # Renew 15 days before expiration
+  commonName: governance-engine.{{ .Release.Namespace }}.svc.cluster.local
+  dnsNames:
+    - governance-engine
+    - governance-engine.{{ .Release.Namespace }}
+    - governance-engine.{{ .Release.Namespace }}.svc
+    - governance-engine.{{ .Release.Namespace }}.svc.cluster.local
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+  issuerRef:
+    name: {{ include "opendatagov.fullname" . }}-ca
+    kind: ClusterIssuer
+
+---
+# PostgreSQL Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-postgresql
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  secretName: postgresql-tls
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # Renew 15 days before expiration
+  commonName: postgresql.{{ .Release.Namespace }}.svc.cluster.local
+  dnsNames:
+    - postgresql
+    - postgresql.{{ .Release.Namespace }}
+    - postgresql.{{ .Release.Namespace }}.svc
+    - postgresql.{{ .Release.Namespace }}.svc.cluster.local
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    name: {{ include "opendatagov.fullname" . }}-ca
+    kind: ClusterIssuer
+
+---
+# Redis Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-redis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  secretName: redis-tls
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # Renew 15 days before expiration
+  commonName: redis-master.{{ .Release.Namespace }}.svc.cluster.local
+  dnsNames:
+    - redis-master
+    - redis-master.{{ .Release.Namespace }}
+    - redis-master.{{ .Release.Namespace }}.svc
+    - redis-master.{{ .Release.Namespace }}.svc.cluster.local
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    name: {{ include "opendatagov.fullname" . }}-ca
+    kind: ClusterIssuer
+
+---
+# Kafka Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-kafka
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka
+spec:
+  secretName: kafka-tls
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # Renew 15 days before expiration
+  commonName: kafka.{{ .Release.Namespace }}.svc.cluster.local
+  dnsNames:
+    - kafka
+    - kafka.{{ .Release.Namespace }}
+    - kafka.{{ .Release.Namespace }}.svc
+    - kafka.{{ .Release.Namespace }}.svc.cluster.local
+    - "*.kafka-headless.{{ .Release.Namespace }}.svc.cluster.local"
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+  issuerRef:
+    name: {{ include "opendatagov.fullname" . }}-ca
+    kind: ClusterIssuer
+
+---
+# MinIO Certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "opendatagov.fullname" . }}-minio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "opendatagov.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  secretName: minio-tls
+  duration: 2160h  # 90 days
+  renewBefore: 360h  # Renew 15 days before expiration
+  commonName: minio.{{ .Release.Namespace }}.svc.cluster.local
+  dnsNames:
+    - minio
+    - minio.{{ .Release.Namespace }}
+    - minio.{{ .Release.Namespace }}.svc
+    - minio.{{ .Release.Namespace }}.svc.cluster.local
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    name: {{ include "opendatagov.fullname" . }}-ca
+    kind: ClusterIssuer
+
+{{- end }}

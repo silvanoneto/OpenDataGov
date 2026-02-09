@@ -1,0 +1,27 @@
+{{- if and .Values.istio.enabled .Values.istio.virtualService.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "kserve.fullname" . }}-inference
+  labels:
+    {{- include "kserve.labels" . | nindent 4 }}
+spec:
+  hosts:
+    - "*.{{ .Values.global.domain }}"
+  gateways:
+    - {{ .Values.istio.virtualService.gateway }}
+  http:
+    - match:
+        - uri:
+            prefix: "/v1/models/"
+      route:
+        - destination:
+            host: kserve-controller-manager-service.{{ .Release.Namespace }}.svc.cluster.local
+            port:
+              number: 80
+      timeout: 300s
+      retries:
+        attempts: 3
+        perTryTimeout: 30s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+{{- end }}

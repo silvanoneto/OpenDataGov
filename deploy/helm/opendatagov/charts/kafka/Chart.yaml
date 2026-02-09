@@ -1,0 +1,20 @@
+apiVersion: v2
+name: kafka
+description: Apache Kafka - Distributed event streaming platform (KRaft mode)
+type: application
+version: 0.1.0
+appVersion: "3.9.0"
+
+keywords:
+  - kafka
+  - streaming
+  - events
+  - messaging
+
+home: https://kafka.apache.org/
+sources:
+  - https://github.com/apache/kafka
+
+maintainers:
+  - name: OpenDataGov Team
+    email: team@opendatagov.local

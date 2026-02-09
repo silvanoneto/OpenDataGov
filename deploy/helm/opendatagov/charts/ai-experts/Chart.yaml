@@ -1,0 +1,22 @@
+apiVersion: v2
+name: ai-experts
+version: 0.1.0
+appVersion: "0.1.0"
+description: AI Experts for OpenDataGov (RAG, Code, Vision, NLP)
+keywords:
+  - ai
+  - ml
+  - nlp
+  - vision
+  - rag
+  - governance
+dependencies:
+  - name: qdrant
+    version: "*"
+    repository: https://qdrant.github.io/qdrant-helm
+    condition: qdrant.enabled
+    tags:
+      - rag
+maintainers:
+  - name: OpenDataGov Team
+    email: governance@opendatagov.org

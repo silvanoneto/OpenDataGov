@@ -5,8 +5,9 @@ Provides standardized serialization for audit events flowing through Kafka.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -60,3 +61,93 @@ def create_audit_event(
         trace_id=trace_id,
         span_id=span_id,
     )
+
+
+# ─── Kafka Publisher Integration (ADR-091) ────────────────────────────
+
+if TYPE_CHECKING:
+    from odg_core.audit import AuditEvent
+    from odg_core.events.kafka_publisher import KafkaPublisher
+
+logger = logging.getLogger(__name__)
+
+
+class AuditKafkaPublisher:
+    """Publishes audit events to Kafka for streaming (ADR-091).
+
+    Complements the PostgreSQL audit trail with Kafka streaming.
+    Maintains SHA-256 hash chain in PostgreSQL while streaming to Kafka.
+    """
+
+    def __init__(self, kafka_publisher: KafkaPublisher) -> None:
+        self.kafka = kafka_publisher
+
+    async def publish_event(self, event: AuditEvent) -> None:
+        """Publish audit event to Kafka topic odg.audit.events.
+
+        Args:
+            event: Audit event from PostgreSQL audit trail
+        """
+        if not self.kafka.is_connected:
+            return
+
+        try:
+            # Convert to Kafka format
+            kafka_event = {
+                "event_type": "audit",
+                "source_service": "audit-trail",
+                "entity_type": event.entity_type,
+                "entity_id": event.entity_id,
+                "actor_id": event.actor_id,
+                "action": event.event_type.value,
+                "description": event.description,
+                "details": event.details or {},
+                "previous_hash": event.previous_hash,
+                "event_hash": event.event_hash,
+                "timestamp": event.occurred_at.isoformat(),
+            }
+
+            # Publish to Kafka (key by entity_id for ordering)
+            await self.kafka.publish(
+                "audit_event",
+                kafka_event,
+                key=event.entity_id,
+            )
+
+            logger.debug("Published audit event %s to Kafka", event.event_hash)
+
+        except Exception:
+            logger.warning("Failed to publish audit event to Kafka", exc_info=True)
+
+    async def publish_batch(self, events: list[AuditEvent]) -> None:
+        """Publish multiple audit events in a batch.
+
+        Args:
+            events: List of audit events
+        """
+        if not self.kafka.is_connected or not events:
+            return
+
+        try:
+            kafka_events = []
+            for event in events:
+                kafka_event = {
+                    "event_type": "audit",
+                    "source_service": "audit-trail",
+                    "entity_type": event.entity_type,
+                    "entity_id": event.entity_id,
+                    "actor_id": event.actor_id,
+                    "action": event.event_type.value,
+                    "description": event.description,
+                    "details": event.details or {},
+                    "previous_hash": event.previous_hash,
+                    "event_hash": event.event_hash,
+                    "timestamp": event.occurred_at.isoformat(),
+                }
+                kafka_events.append(("audit_event", kafka_event))
+
+            await self.kafka.publish_batch(kafka_events)
+            logger.debug("Published batch of %d audit events to Kafka", len(events))
+
+        except Exception:
+            logger.warning("Failed to publish audit event batch to Kafka", exc_info=True)

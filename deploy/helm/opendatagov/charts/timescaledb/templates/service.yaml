@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "timescaledb.fullname" . }}
+  labels:
+    {{- include "timescaledb.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - port: {{ .Values.service.port }}
+    targetPort: postgresql
+    protocol: TCP
+    name: postgresql
+  selector:
+    {{- include "timescaledb.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "timescaledb.fullname" . }}-headless
+  labels:
+    {{- include "timescaledb.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: {{ .Values.service.port }}
+    targetPort: postgresql
+    protocol: TCP
+    name: postgresql
+  selector:
+    {{- include "timescaledb.selectorLabels" . | nindent 4 }}

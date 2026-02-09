@@ -1,0 +1,13 @@
+apiVersion: v2
+name: gateway
+description: OpenDataGov API Gateway - Core API gateway and routing service
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - gateway
+  - data-gateway
+  - decision-engine
+home: https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team

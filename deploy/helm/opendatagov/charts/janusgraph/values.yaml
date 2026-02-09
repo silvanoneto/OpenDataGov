@@ -1,0 +1,134 @@
+## JanusGraph Configuration for Data Lineage Graph
+
+## Enable Cassandra backend
+cassandra:
+  enabled: true
+  clusterSize: 3
+
+## JanusGraph server configuration
+replicaCount: 2
+
+image:
+  repository: janusgraph/janusgraph
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+## Service configuration
+service:
+  type: ClusterIP
+  port: 8182  # Gremlin Server port
+  annotations: {}
+
+## Resource limits
+resources:
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+## JanusGraph properties
+properties:
+  storage:
+    backend: cql  # Cassandra
+    hostname: cassandra
+    port: 9042
+    cql:
+      keyspace: janusgraph
+      replication-factor: 3
+      replication-strategy-class: SimpleStrategy
+
+  index:
+    search:
+      backend: lucene  # Embedded search (or elasticsearch for production)
+      directory: /var/lib/janusgraph/index
+
+  cache:
+    db-cache: true
+    db-cache-clean-wait: 20
+    db-cache-time: 180000
+    db-cache-size: 0.25
+
+## Gremlin Server configuration
+gremlinServer:
+  channelizer: org.janusgraph.channelizers.JanusGraphWebSocketChannelizer
+  graphs:
+    lineage: /etc/opt/janusgraph/janusgraph.properties
+  scriptEngines:
+    gremlin-groovy:
+      plugins:
+        org.janusgraph.graphdb.tinkerpop.plugin.JanusGraphGremlinPlugin: {}
+
+## Persistence for indexes
+persistence:
+  enabled: true
+  storageClass: ""
+  size: 10Gi
+  accessMode: ReadWriteOnce
+
+## Readiness probe
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+## Liveness probe
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+## Pod Security Context
+podSecurityContext:
+  fsGroup: 999
+  runAsUser: 999
+  runAsNonRoot: true
+
+## Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 999
+
+## Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+## Node selector
+nodeSelector: {}
+
+## Tolerations
+tolerations: []
+
+## Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - janusgraph
+          topologyKey: kubernetes.io/hostname
+
+## Initialize lineage graph schema
+initSchema:
+  enabled: true
+  # Vertex labels: Dataset, Pipeline, Model, Feature
+  # Edge labels: DERIVED_FROM, TRAINED_ON, GENERATED_BY, CONSUMED_BY

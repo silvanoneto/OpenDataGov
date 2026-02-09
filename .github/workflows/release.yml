@@ -1,0 +1,415 @@
+name: Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'      # Trigger on version tags (v1.0.0, v1.0.1, etc.)
+  workflow_dispatch:  # Allow manual trigger
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  HELM_REGISTRY: oci://ghcr.io/opendatagov
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      is_lts: ${{ steps.check_lts.outputs.is_lts }}
+      is_prerelease: ${{ steps.check_prerelease.outputs.is_prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?(\+[a-z0-9.]+)?$ ]]; then
+            echo "Error: Invalid version format: $VERSION"
+            echo "Expected: vMAJOR.MINOR.PATCH[-prerelease][+buildmetadata]"
+            exit 1
+          fi
+          echo "✅ Valid version format: $VERSION"
+
+      - name: Check if LTS release
+        id: check_lts
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # LTS releases are X.0.0 (e.g., v1.0.0, v2.0.0)
+          if [[ $VERSION =~ ^v[0-9]+\.0\.0$ ]]; then
+            echo "is_lts=true" >> $GITHUB_OUTPUT
+            echo "✅ This is an LTS release"
+          else
+            echo "is_lts=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  This is a regular release"
+          fi
+
+      - name: Check if prerelease
+        id: check_prerelease
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if [[ $VERSION =~ -[a-z] ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "⚠️  This is a prerelease (alpha/beta/rc)"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "✅ This is a stable release"
+          fi
+
+  test:
+    name: Run Tests
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-suite:
+          - unit
+          - integration
+          - e2e
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -e libs/python/odg-core[all]
+
+      - name: Run ${{ matrix.test-suite }} tests
+        run: |
+          pytest tests/${{ matrix.test-suite }}/ \
+            --cov=odg_core \
+            --cov-report=xml \
+            --junit-xml=test-results-${{ matrix.test-suite }}.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.test-suite }}
+          path: test-results-${{ matrix.test-suite }}.xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: ${{ matrix.test-suite }}
+
+  security-scan:
+    name: Security Scan
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/python@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  build-images:
+    name: Build Docker Images
+    needs: [validate, test, security-scan]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - governance-engine
+          - lakehouse-agent
+          - expert-orchestrator
+          - gpu-manager
+          - federation-service
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/opendatagov/${{ matrix.service }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.validate.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.validate.outputs.version }}
+            type=raw,value=lts,enable=${{ needs.validate.outputs.is_lts == 'true' }}
+            type=raw,value=latest,enable=${{ needs.validate.outputs.is_prerelease == 'false' }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  build-helm-chart:
+    name: Build Helm Chart
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Update Chart.yaml with version
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          VERSION_NO_V="${VERSION#v}"
+
+          yq eval ".version = \"$VERSION_NO_V\"" -i deploy/helm/opendatagov/Chart.yaml
+          yq eval ".appVersion = \"$VERSION_NO_V\"" -i deploy/helm/opendatagov/Chart.yaml
+
+      - name: Lint Helm chart
+        run: |
+          helm lint deploy/helm/opendatagov
+
+      - name: Package Helm chart
+        run: |
+          helm package deploy/helm/opendatagov \
+            --destination .helm-charts
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login ${{ env.REGISTRY }} --username ${{ github.actor }} --password-stdin
+
+      - name: Push Helm chart
+        run: |
+          helm push .helm-charts/opendatagov-*.tgz ${{ env.HELM_REGISTRY }}
+
+      - name: Upload Helm chart artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart
+          path: .helm-charts/opendatagov-*.tgz
+
+  database-migrations:
+    name: Test Database Migrations
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Alembic
+        run: pip install alembic psycopg2-binary
+
+      - name: Test migrations (upgrade)
+        run: |
+          cd libs/python/odg-core
+          alembic upgrade head
+
+      - name: Test migrations (downgrade)
+        run: |
+          cd libs/python/odg-core
+          alembic downgrade -1
+          alembic upgrade head
+
+  generate-changelog:
+    name: Generate Changelog
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install semantic-release
+        run: |
+          npm install -g \
+            semantic-release \
+            @semantic-release/changelog \
+            @semantic-release/git \
+            @semantic-release/github
+
+      - name: Generate release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx semantic-release \
+            --dry-run \
+            --branches main \
+            --plugins @semantic-release/changelog,@semantic-release/release-notes-generator
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.md
+
+  create-release:
+    name: Create GitHub Release
+    needs:
+      - validate
+      - test
+      - security-scan
+      - build-images
+      - build-helm-chart
+      - database-migrations
+      - generate-changelog
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog
+
+      - name: Download Helm chart
+        uses: actions/download-artifact@v4
+        with:
+          name: helm-chart
+          path: .helm-charts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: Release ${{ needs.validate.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
+          files: |
+            .helm-charts/opendatagov-*.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add LTS label
+        if: needs.validate.outputs.is_lts == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.release.id,
+              labels: ['LTS', 'long-term-support']
+            })
+
+  notify:
+    name: Notify Release
+    needs: [validate, create-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "🚀 New OpenDataGov release: ${{ needs.validate.outputs.version }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*OpenDataGov ${{ needs.validate.outputs.version }}* released! 🎉\n\n${{ needs.validate.outputs.is_lts == 'true' && '⭐ *LTS Release* (24 months support)' || '📦 Regular Release' }}\n\n<https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}|View Release Notes>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "[OpenDataGov] Release ${{ needs.validate.outputs.version }}"
+          to: releases@opendatagov.io
+          from: noreply@opendatagov.io
+          body: |
+            OpenDataGov ${{ needs.validate.outputs.version }} has been released.
+
+            ${{ needs.validate.outputs.is_lts == 'true' && 'This is an LTS release with 24 months of support.' || 'This is a regular release.' }}
+
+            Release Notes: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}
+
+            Upgrade Guide: https://docs.opendatagov.io/upgrade/${{ needs.validate.outputs.version }}

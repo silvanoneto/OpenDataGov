@@ -58,7 +58,7 @@ class PgDecisionRepository:
             raise ValueError(f"Decision {decision.id} not found")
         row.status = decision.status
         row.updated_at = decision.updated_at
-        row.metadata_json = decision.metadata  # type: ignore[assignment]
+        row.metadata_json = decision.metadata
         await self._session.flush()
         return GovernanceDecision.model_validate(row)
 

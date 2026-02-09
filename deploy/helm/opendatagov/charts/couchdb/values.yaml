@@ -1,0 +1,145 @@
+## Apache CouchDB Configuration
+## Ref: https://docs.couchdb.org/en/stable/
+
+## Cluster configuration
+clusterSize: 3  # Number of CouchDB nodes in the cluster
+allowAdminParty: false  # Disable admin party (requires authentication)
+
+## Image configuration
+image:
+  repository: couchdb
+  tag: "3.3.3"
+  pullPolicy: IfNotPresent
+
+## Admin credentials
+## IMPORTANT: Change these in production!
+adminUsername: admin
+adminPassword: changeme_couchdb_admin
+
+## CouchDB configuration
+couchdbConfig:
+  couchdb:
+    uuid: "decafbaddecafbaddecafbaddecafbad"  # Will be auto-generated on first run
+    max_document_size: "67108864"  # 64MB
+    max_attachment_size: "infinity"
+
+  chttpd:
+    bind_address: "0.0.0.0"
+    port: "5984"
+    require_valid_user: "true"
+    max_http_request_size: "4294967296"  # 4GB
+
+  httpd:
+    enable_cors: "true"
+    secure_rewrites: "true"
+
+  cors:
+    origins: "*"
+    credentials: "true"
+    methods: "GET, PUT, POST, HEAD, DELETE"
+    headers: "accept, authorization, content-type, origin, referer, x-csrf-token"
+
+  cluster:
+    q: "8"  # Number of shards
+    n: "3"  # Number of replicas per shard
+
+## Service configuration
+service:
+  type: ClusterIP
+  port: 5984
+  annotations: {}
+
+## Resource limits
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+## Persistence
+persistentVolume:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  storageClass: ""  # Use default storage class
+
+## Readiness probe
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+## Liveness probe
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+## Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+## Pod Security Context
+podSecurityContext:
+  fsGroup: 5984
+  runAsUser: 5984
+  runAsNonRoot: true
+
+## Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 5984
+
+## Node selector
+nodeSelector: {}
+
+## Tolerations
+tolerations: []
+
+## Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - couchdb
+          topologyKey: kubernetes.io/hostname
+
+## Enable Erlang cookie for clustering
+## Auto-generated if not provided
+erlangCookie: ""
+
+## Databases to create on initialization
+initDatabases:
+  - model_registry  # Store ML model metadata documents
+  - governance_documents  # Store governance decisions and approvals
+  - audit_trail  # Immutable audit log documents
+  - feature_definitions  # Feast feature definitions
+  - pipeline_configs  # Pipeline configuration documents
+
+## Backup configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 7  # Keep 7 days of backups

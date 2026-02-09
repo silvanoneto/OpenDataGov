@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package odg.proto.v1;
+
+option go_package = "github.com/silvanoneto/opendatagov/libs/go/odg-proto/gen/go/v1";
+
+import "google/protobuf/timestamp.proto";
+
+// DAMADimension represents the DAMA data quality dimensions.
+enum DAMADimension {
+  DAMA_DIMENSION_UNSPECIFIED = 0;
+  DAMA_DIMENSION_COMPLETENESS = 1;
+  DAMA_DIMENSION_ACCURACY = 2;
+  DAMA_DIMENSION_VALIDITY = 3;
+  DAMA_DIMENSION_CONSISTENCY = 4;
+  DAMA_DIMENSION_TIMELINESS = 5;
+  DAMA_DIMENSION_UNIQUENESS = 6;
+}
+
+// QualityDimension represents a single DAMA dimension result.
+message QualityDimension {
+  DAMADimension dimension = 1;
+  bool passed = 2;
+  double score = 3;
+  string message = 4;
+}
+
+// QualityReport represents a data quality validation report.
+message QualityReport {
+  string id = 1;
+  string dataset_id = 2;
+  string domain_id = 3;
+  string layer = 4;
+  string suite_name = 5;
+  double dq_score = 6;
+  repeated QualityDimension dimensions = 7;
+  int32 expectations_passed = 8;
+  int32 expectations_failed = 9;
+  int32 expectations_total = 10;
+  google.protobuf.Timestamp created_at = 11;
+  bool passed = 12;
+}
+
+// Request to validate a dataset.
+message ValidateDatasetRequest {
+  string dataset_id = 1;
+  string domain_id = 2;
+  string layer = 3;
+  string suite_name = 4;
+}
+
+// Request to get latest quality report for a dataset.
+message GetQualityReportRequest {
+  string dataset_id = 1;
+}
+
+// Request to list quality reports with filters.
+message ListQualityReportsRequest {
+  string domain_id = 1;
+  string layer = 2;
+  bool passed_only = 3;
+  int32 limit = 4;
+  int32 offset = 5;
+}
+
+// Response containing list of quality reports.
+message ListQualityReportsResponse {
+  repeated QualityReport reports = 1;
+  int32 total_count = 2;
+}
+
+// QualityService provides gRPC endpoints for data quality validation.
+service QualityService {
+  // Validate a dataset and return quality report.
+  rpc ValidateDataset(ValidateDatasetRequest) returns (QualityReport);
+
+  // Get latest quality report for a dataset.
+  rpc GetQualityReport(GetQualityReportRequest) returns (QualityReport);
+
+  // List quality reports with filters.
+  rpc ListQualityReports(ListQualityReportsRequest) returns (ListQualityReportsResponse);
+}

@@ -1,0 +1,163 @@
+# Apache Flink Helm Chart Values
+# Real-time stream processing for OpenDataGov
+
+global:
+  imageRegistry: docker.io
+  imagePullPolicy: IfNotPresent
+
+# Flink JobManager (coordination)
+jobManager:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: flink
+    tag: "1.18.0-scala_2.12"
+  service:
+    type: ClusterIP
+    port: 8081  # Web UI
+    rpc: 6123   # RPC port
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+  # High availability
+  ha:
+    enabled: false  # Enable for production
+    storageDir: s3://flink-ha/
+    zookeeper: zookeeper:2181
+
+# Flink TaskManager (execution)
+taskManager:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: flink
+    tag: "1.18.0-scala_2.12"
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 4
+      memory: 8Gi
+  # Task slots per TaskManager
+  taskSlots: 2
+
+# Flink configuration
+flink:
+  # Checkpointing
+  checkpointing:
+    enabled: true
+    interval: 60000  # 1 minute
+    minPauseBetween: 500
+    timeout: 600000  # 10 minutes
+    storage: s3://flink-checkpoints/
+
+  # State backend
+  stateBackend:
+    type: rocksdb  # rocksdb or hashmap
+    incrementalCheckpoints: true
+
+  # Parallelism
+  parallelism:
+    default: 4
+    max: 16
+
+  # Restart strategy
+  restartStrategy:
+    type: fixed-delay
+    attempts: 3
+    delay: 10000  # 10 seconds
+
+# Kafka integration
+kafka:
+  enabled: true
+  bootstrapServers: kafka:9092
+  topics:
+    # Input topics
+    input:
+      - odg.events.raw
+      - odg.lakehouse.bronze
+      - odg.transactions.realtime
+    # Output topics
+    output:
+      - odg.features.realtime
+      - odg.analytics.aggregated
+      - odg.dq.alerts
+
+# Feast integration
+feast:
+  enabled: true
+  onlineStore:
+    type: redis
+    host: redis-master
+    port: 6379
+  offlineStore:
+    type: parquet
+    path: s3://feast-offline/
+
+# Real-time DQ monitoring
+dataQuality:
+  enabled: true
+  checkInterval: 60  # seconds
+  alertThresholds:
+    completeness: 0.95
+    freshness: 300  # 5 minutes
+    rowCount: 100  # min rows per window
+
+# Jobs (pre-configured streaming jobs)
+jobs:
+  # Real-time feature materialization
+  featureMaterialization:
+    enabled: true
+    parallelism: 4
+    checkpointInterval: 60000
+
+  # Real-time DQ monitoring
+  qualityMonitoring:
+    enabled: true
+    parallelism: 2
+    windowSize: 300  # 5 minutes
+
+  # Real-time aggregations
+  realtimeAggregation:
+    enabled: true
+    parallelism: 4
+    windowSize: 60  # 1 minute
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+  metrics:
+    reporters:
+      - prometheus
+
+# Security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 9999
+  fsGroup: 9999
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: false  # Flink needs write access
+
+# Service Account
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Node selectors and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,20 @@
+apiVersion: v2
+name: couchdb
+description: Apache CouchDB - Document-oriented NoSQL database
+type: application
+version: 1.0.0
+appVersion: "3.3.3"
+
+keywords:
+  - couchdb
+  - nosql
+  - document-store
+  - database
+
+home: https://couchdb.apache.org/
+sources:
+  - https://github.com/apache/couchdb
+
+maintainers:
+  - name: OpenDataGov Team
+    email: team@opendatagov.local

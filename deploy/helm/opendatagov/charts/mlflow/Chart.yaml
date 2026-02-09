@@ -1,0 +1,18 @@
+apiVersion: v2
+name: mlflow
+version: 0.1.0
+appVersion: "2.10.0"
+description: MLflow tracking server with B-Swarm governance integration
+keywords:
+  - mlflow
+  - mlops
+  - experiment-tracking
+  - model-registry
+home: https://github.com/silvanoneto/opendatagov
+maintainers:
+  - name: OpenDataGov Team
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
